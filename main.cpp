@@ -7,6 +7,11 @@
 ADC_HandleTypeDef adc_handle = {};
 
 uint16_t adc_ref_voltage = 0;
+volatile uint32_t adc_error = 0;
+
+volatile uint16_t adc_value = 0;
+volatile uint64_t conversions = 0;
+volatile uint64_t adc_sum = 0;
 
 extern "C"
 {
@@ -32,13 +37,15 @@ extern "C"
 
     void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
     {
-        uint32_t value = __LL_ADC_CALC_DATA_TO_VOLTAGE(adc_ref_voltage, HAL_ADC_GetValue(hadc), LL_ADC_RESOLUTION_12B);
-        printf("ADC conv callback: %lumv\n", value);
+        uint16_t value = __LL_ADC_CALC_DATA_TO_VOLTAGE(adc_ref_voltage, HAL_ADC_GetValue(hadc), LL_ADC_RESOLUTION_12B);
+        adc_sum += value;
+        // adc_value = value;
+        ++conversions;
     }
 
     void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *hadc)
     {
-        printf("ADC error callback\n");
+        adc_error = hadc->ErrorCode;
     }
 }
 
@@ -60,9 +67,9 @@ void ADC_init()
     adc_handle.Init.Resolution = ADC_RESOLUTION_12B;
     adc_handle.Init.DataAlign = ADC_DATAALIGN_RIGHT;
     adc_handle.Init.ScanConvMode = ADC_SCAN_DISABLE;
-    adc_handle.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+    adc_handle.Init.EOCSelection = ADC_EOC_SEQ_CONV;
     adc_handle.Init.LowPowerAutoWait = DISABLE;
-    adc_handle.Init.ContinuousConvMode = DISABLE;
+    adc_handle.Init.ContinuousConvMode = ENABLE;
     adc_handle.Init.NbrOfConversion = 1;
     adc_handle.Init.DiscontinuousConvMode = DISABLE;
     adc_handle.Init.ExternalTrigConv = ADC_SOFTWARE_START;
@@ -77,7 +84,7 @@ void ADC_init()
     ADC_ChannelConfTypeDef channel = {};
     channel.Channel = ADC_CHANNEL_VREFINT;
     channel.Rank = ADC_REGULAR_RANK_1;
-    channel.SamplingTime = ADC_SAMPLETIME_247CYCLES_5;
+    channel.SamplingTime = ADC_SAMPLETIME_6CYCLES_5;
     channel.SingleDiff = ADC_SINGLE_ENDED;
     channel.OffsetNumber = ADC_OFFSET_NONE;
     channel.Offset = 0;
@@ -95,9 +102,49 @@ void ADC_init()
     check(HAL_ADC_ConfigChannel(&adc_handle, &channel), "ADC channel config");
 }
 
+void clock_init()
+{
+    RCC_OscInitTypeDef RCC_OscInitStruct = {0};
+    RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+
+    __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE0);
+    while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
+
+    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
+    RCC_OscInitStruct.HSEState = RCC_HSE_ON;
+    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
+    RCC_OscInitStruct.PLL.PLLSource = RCC_PLL1_SOURCE_HSE;
+    RCC_OscInitStruct.PLL.PLLM = 12;
+    RCC_OscInitStruct.PLL.PLLN = 250;
+    RCC_OscInitStruct.PLL.PLLP = 2;
+    RCC_OscInitStruct.PLL.PLLQ = 2;
+    RCC_OscInitStruct.PLL.PLLR = 2;
+    RCC_OscInitStruct.PLL.PLLRGE = RCC_PLL1_VCIRANGE_1;
+    RCC_OscInitStruct.PLL.PLLVCOSEL = RCC_PLL1_VCORANGE_WIDE;
+    RCC_OscInitStruct.PLL.PLLFRACN = 0;
+    check(HAL_RCC_OscConfig(&RCC_OscInitStruct), "RCC config");
+
+    /** Initializes the CPU, AHB and APB buses clocks
+     */
+    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
+                                |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2
+                                |RCC_CLOCKTYPE_PCLK3;
+    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
+    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
+    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
+    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
+    RCC_ClkInitStruct.APB3CLKDivider = RCC_HCLK_DIV1;
+
+    check(HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5), "Clock config");
+    HAL_RCC_MCOConfig(RCC_MCO2, RCC_MCO2SOURCE_SYSCLK, RCC_MCODIV_1);
+}
+
 int main(void)
 {
     HAL_Init();
+    HAL_NVIC_SetPriority(SysTick_IRQn, 0, 0);
+
+    clock_init();
 
     BSP_LED_Init(LED2);
     BSP_PB_Init(BUTTON_USER, BUTTON_MODE_EXTI);
@@ -120,11 +167,23 @@ int main(void)
 
     HAL_ICACHE_Enable();
 
+    BSP_LED_On(LED2);
+    HAL_ADC_Start_IT(&adc_handle);
+
+    const unsigned delay = 1000;
+
     for (;;)
     {
-        HAL_Delay(1000);
-        BSP_LED_Toggle(LED2);
-        HAL_ADC_Start_IT(&adc_handle);
+        HAL_Delay(delay);
+        if (adc_error != HAL_ADC_ERROR_NONE)
+        {
+            printf("ADC error: %lu\n", adc_error);
+            adc_error = HAL_ADC_ERROR_NONE;
+        }
+        printf("conv/sec: %llu\n", conversions);
+        printf("adc avg: %llu\n", adc_sum / conversions);
+        conversions = 0;
+        adc_sum = 0;
     }
 
     return 0;
