@@ -10,6 +10,10 @@ set(CMAKE_INCLUDE_CURRENT_DIR TRUE)
 
 add_executable(hello main.cpp stm32h5xx_nucleo.c syscalls.c)
 target_link_libraries(hello
+        HAL::STM32::H5::ADC
+        HAL::STM32::H5::ADCEx
+        HAL::STM32::H5::DMA
+        HAL::STM32::H5::ICACHE
         HAL::STM32::H5::RCCEx
         HAL::STM32::H5::EXTI
         HAL::STM32::H5::GPIO
