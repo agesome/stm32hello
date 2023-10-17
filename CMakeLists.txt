@@ -13,6 +13,7 @@ target_link_libraries(hello
         HAL::STM32::H5::ADC
         HAL::STM32::H5::ADCEx
         HAL::STM32::H5::DMA
+        HAL::STM32::H5::DMAEx
         HAL::STM32::H5::ICACHE
         HAL::STM32::H5::RCCEx
         HAL::STM32::H5::EXTI

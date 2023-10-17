@@ -5,13 +5,19 @@
 #define check(F,D) do { if(F != HAL_OK) { printf(D" failed\n"); } else { printf (D" OK\n"); } } while(0)
 
 ADC_HandleTypeDef adc_handle = {};
+DMA_HandleTypeDef dma_handle = {};
+
+DMA_NodeTypeDef dma_list_node;
+DMA_QListTypeDef dma_list;
 
 uint16_t adc_ref_voltage = 0;
 volatile uint32_t adc_error = 0;
 
-volatile uint16_t adc_value = 0;
 volatile uint64_t conversions = 0;
 volatile uint64_t adc_sum = 0;
+
+const size_t buflen = 1024;
+uint16_t buffer[buflen];
 
 extern "C"
 {
@@ -35,12 +41,28 @@ extern "C"
         HAL_ADC_IRQHandler(&adc_handle);
     }
 
+    void GPDMA1_Channel0_IRQHandler()
+    {
+        HAL_DMA_IRQHandler(&dma_handle);
+        HAL_ADC_IRQHandler(&adc_handle);
+    }
+
     void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
     {
-        uint16_t value = __LL_ADC_CALC_DATA_TO_VOLTAGE(adc_ref_voltage, HAL_ADC_GetValue(hadc), LL_ADC_RESOLUTION_12B);
-        adc_sum += value;
-        // adc_value = value;
-        ++conversions;
+        for (size_t i = buflen / 2; i < buflen; ++i)
+        {
+            adc_sum += __LL_ADC_CALC_DATA_TO_VOLTAGE(adc_ref_voltage, buffer[i], LL_ADC_RESOLUTION_12B);
+        }
+        conversions += buflen / 2;
+    }
+
+    void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef *hadc)
+    {
+        for (size_t i = 0; i < buflen / 2; ++i)
+        {
+            adc_sum += __LL_ADC_CALC_DATA_TO_VOLTAGE(adc_ref_voltage, buffer[i], LL_ADC_RESOLUTION_12B);
+        }
+        conversions += buflen / 2;
     }
 
     void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *hadc)
@@ -51,6 +73,36 @@ extern "C"
 
 void ADC_init()
 {
+    __HAL_RCC_GPDMA1_CLK_ENABLE();
+
+    DMA_NodeConfTypeDef node = {};
+
+    node.NodeType = DMA_GPDMA_LINEAR_NODE;
+    node.Init.Request = GPDMA1_REQUEST_ADC1;
+    node.Init.Direction = DMA_PERIPH_TO_MEMORY;
+    node.Init.DestInc = DMA_DINC_INCREMENTED;
+    node.Init.SrcDataWidth = DMA_SRC_DATAWIDTH_HALFWORD;
+    node.Init.DestDataWidth = DMA_DEST_DATAWIDTH_HALFWORD;
+    node.Init.SrcBurstLength = 1;
+    node.Init.DestBurstLength = 64; // ???
+    node.Init.TransferAllocatedPort = DMA_SRC_ALLOCATED_PORT0|DMA_DEST_ALLOCATED_PORT0;
+
+    check(HAL_DMAEx_List_BuildNode(&node, &dma_list_node), "DMA build node");
+    check(HAL_DMAEx_List_InsertNode_Tail(&dma_list, &dma_list_node), "DMA insert node");
+    check(HAL_DMAEx_List_SetCircularModeConfig(&dma_list, &dma_list_node), "DMA make list circular");
+
+    dma_handle.Instance = GPDMA1_Channel0;
+    dma_handle.Parent = &adc_handle;
+    dma_handle.InitLinkedList.Priority = DMA_HIGH_PRIORITY;
+    dma_handle.InitLinkedList.LinkStepMode = DMA_LSM_FULL_EXECUTION;
+    dma_handle.InitLinkedList.LinkAllocatedPort = DMA_LINK_ALLOCATED_PORT0;
+    dma_handle.InitLinkedList.TransferEventMode = DMA_TCEM_BLOCK_TRANSFER;
+    dma_handle.InitLinkedList.LinkedListMode = DMA_LINKEDLIST_CIRCULAR;
+
+    check(HAL_DMAEx_List_Init(&dma_handle), "DMA init");
+    check(HAL_DMAEx_List_LinkQ(&dma_handle, &dma_list), "DMA link list to handle");
+    HAL_NVIC_EnableIRQ(GPDMA1_Channel0_IRQn);
+
     __HAL_RCC_ADC_CLK_ENABLE();
     __HAL_RCC_GPIOA_CLK_ENABLE();
 
@@ -63,7 +115,8 @@ void ADC_init()
     HAL_GPIO_Init(GPIOA, &gpio);
 
     adc_handle.Instance = ADC1;
-    adc_handle.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV4;
+    adc_handle.DMA_Handle = &dma_handle;
+    adc_handle.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV2;
     adc_handle.Init.Resolution = ADC_RESOLUTION_12B;
     adc_handle.Init.DataAlign = ADC_DATAALIGN_RIGHT;
     adc_handle.Init.ScanConvMode = ADC_SCAN_DISABLE;
@@ -74,7 +127,7 @@ void ADC_init()
     adc_handle.Init.DiscontinuousConvMode = DISABLE;
     adc_handle.Init.ExternalTrigConv = ADC_SOFTWARE_START;
     adc_handle.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-    adc_handle.Init.DMAContinuousRequests = DISABLE;
+    adc_handle.Init.DMAContinuousRequests = ENABLE;
     adc_handle.Init.SamplingMode = ADC_SAMPLING_MODE_NORMAL;
     adc_handle.Init.Overrun = ADC_OVR_DATA_PRESERVED;
     adc_handle.Init.OversamplingMode = DISABLE;
@@ -168,9 +221,10 @@ int main(void)
     HAL_ICACHE_Enable();
 
     BSP_LED_On(LED2);
-    HAL_ADC_Start_IT(&adc_handle);
 
     const unsigned delay = 1000;
+
+    check(HAL_ADC_Start_DMA(&adc_handle, (uint32_t *) &buffer, buflen), "Start ADC");
 
     for (;;)
     {
