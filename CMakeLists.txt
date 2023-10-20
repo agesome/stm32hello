@@ -2,13 +2,14 @@ cmake_minimum_required(VERSION 3.16)
 set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/stm32_gcc.cmake)
 
 project(hello C CXX ASM)
+set(CMAKE_CXX_STANDARD 20)
 
 find_package(CMSIS COMPONENTS STM32H503 REQUIRED)
 find_package(HAL COMPONENTS STM32H503 REQUIRED)
 
 set(CMAKE_INCLUDE_CURRENT_DIR TRUE)
 
-add_executable(hello main.cpp stm32h5xx_nucleo.c syscalls.c)
+add_executable(hello main.cpp init.cpp stm32h5xx_nucleo.c stm32h5xx_it.c syscalls.c)
 target_link_libraries(hello
         HAL::STM32::H5::ADC
         HAL::STM32::H5::ADCEx
