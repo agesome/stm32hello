@@ -3,14 +3,14 @@
 
 #define check(F,D) do { if(F != HAL_OK) { printf(D" failed\n"); } else { printf (D" OK\n"); } } while(0)
 
-ADC_HandleTypeDef & adc_init()
+ADC_HandleTypeDef * adc_init()
 {
     __HAL_RCC_ADC_CLK_ENABLE();
     __HAL_RCC_GPIOA_CLK_ENABLE();
 
     HAL_NVIC_EnableIRQ(ADC1_IRQn);
 
-    GPIO_InitTypeDef gpio = 
+    const GPIO_InitTypeDef gpio = 
     {
         .Pin =  GPIO_PIN_0,
         .Mode = GPIO_MODE_ANALOG
@@ -22,7 +22,7 @@ ADC_HandleTypeDef & adc_init()
         .Instance = ADC1,
         .Init = 
         {
-            .ClockPrescaler = ADC_CLOCK_ASYNC_DIV2,
+            .ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2,
             .Resolution = ADC_RESOLUTION_12B,
             .EOCSelection = ADC_EOC_SEQ_CONV,
             .ContinuousConvMode = ENABLE,
@@ -32,11 +32,11 @@ ADC_HandleTypeDef & adc_init()
 
     check(HAL_ADC_Init(&handle), "ADC init");
 
-    ADC_ChannelConfTypeDef channel = 
+    const ADC_ChannelConfTypeDef channel = 
     {
         .Channel = ADC_CHANNEL_0,
         .Rank = ADC_REGULAR_RANK_1,
-        .SamplingTime = ADC_SAMPLETIME_6CYCLES_5,
+        .SamplingTime = ADC_SAMPLETIME_2CYCLES_5,
         .SingleDiff = ADC_SINGLE_ENDED,
         .OffsetNumber = ADC_OFFSET_NONE,
     };
@@ -44,10 +44,10 @@ ADC_HandleTypeDef & adc_init()
     check(HAL_ADC_ConfigChannel(&handle, &channel), "ADC channel config");
     check(HAL_ADCEx_Calibration_Start(&handle, ADC_SINGLE_ENDED), "ADC calibration");
 
-    return handle;
+    return &handle;
 }
 
-DMA_HandleTypeDef & dma_init()
+DMA_HandleTypeDef * dma_init()
 {
     __HAL_RCC_GPDMA1_CLK_ENABLE();
     HAL_NVIC_EnableIRQ(GPDMA1_Channel0_IRQn);
@@ -77,7 +77,6 @@ DMA_HandleTypeDef & dma_init()
     static DMA_HandleTypeDef handle = 
     {
         .Instance = GPDMA1_Channel0,
-        // .Parent = &adc_handle;
         .InitLinkedList = 
         {
             .Priority = DMA_HIGH_PRIORITY,
@@ -91,42 +90,46 @@ DMA_HandleTypeDef & dma_init()
     check(HAL_DMAEx_List_Init(&handle), "DMA init");
     check(HAL_DMAEx_List_LinkQ(&handle, &list), "DMA link list to handle");
 
-    return handle;
+    return &handle;
 }
 
 void clock_init()
 {
-    RCC_OscInitTypeDef RCC_OscInitStruct = {0};
-    RCC_ClkInitTypeDef RCC_ClkInitStruct = {0};
+    // high voltage scale for high clocks
+    check(HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE0), "set voltage scale");
 
-    __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE0);
-    while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
+    // HSE -> PLL1 at 250MHz
+    const RCC_OscInitTypeDef init =
+    {
+        .OscillatorType = RCC_OSCILLATORTYPE_HSE,
+        .HSEState = RCC_HSE_ON,
+        .PLL = 
+        {
+            .PLLState = RCC_PLL_ON,
+            .PLLSource = RCC_PLL1_SOURCE_HSE,
+            .PLLM = 12,
+            .PLLN = 250,
+            .PLLP = 2,
+            .PLLQ = 2,
+            .PLLR = 2,
+            .PLLRGE = RCC_PLL1_VCIRANGE_1,
+            .PLLVCOSEL = RCC_PLL1_VCORANGE_WIDE,
+            .PLLFRACN = 0
+        }
+    };
 
-    RCC_OscInitStruct.OscillatorType = RCC_OSCILLATORTYPE_HSE;
-    RCC_OscInitStruct.HSEState = RCC_HSE_ON;
-    RCC_OscInitStruct.PLL.PLLState = RCC_PLL_ON;
-    RCC_OscInitStruct.PLL.PLLSource = RCC_PLL1_SOURCE_HSE;
-    RCC_OscInitStruct.PLL.PLLM = 12;
-    RCC_OscInitStruct.PLL.PLLN = 250;
-    RCC_OscInitStruct.PLL.PLLP = 2;
-    RCC_OscInitStruct.PLL.PLLQ = 2;
-    RCC_OscInitStruct.PLL.PLLR = 2;
-    RCC_OscInitStruct.PLL.PLLRGE = RCC_PLL1_VCIRANGE_1;
-    RCC_OscInitStruct.PLL.PLLVCOSEL = RCC_PLL1_VCORANGE_WIDE;
-    RCC_OscInitStruct.PLL.PLLFRACN = 0;
-    check(HAL_RCC_OscConfig(&RCC_OscInitStruct), "RCC config");
+    check(HAL_RCC_OscConfig(&init), "RCC config");
 
-    /** Initializes the CPU, AHB and APB buses clocks
-     */
-    RCC_ClkInitStruct.ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK
-                                |RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2
-                                |RCC_CLOCKTYPE_PCLK3;
-    RCC_ClkInitStruct.SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK;
-    RCC_ClkInitStruct.AHBCLKDivider = RCC_SYSCLK_DIV1;
-    RCC_ClkInitStruct.APB1CLKDivider = RCC_HCLK_DIV1;
-    RCC_ClkInitStruct.APB2CLKDivider = RCC_HCLK_DIV1;
-    RCC_ClkInitStruct.APB3CLKDivider = RCC_HCLK_DIV1;
+    // all clocks from PLL1
+    const RCC_ClkInitTypeDef clocks =
+    {
+        .ClockType = RCC_CLOCKTYPE_HCLK|RCC_CLOCKTYPE_SYSCLK|RCC_CLOCKTYPE_PCLK1|RCC_CLOCKTYPE_PCLK2|RCC_CLOCKTYPE_PCLK3,
+        .SYSCLKSource = RCC_SYSCLKSOURCE_PLLCLK,
+        .AHBCLKDivider = RCC_SYSCLK_DIV1,
+        .APB1CLKDivider = RCC_HCLK_DIV1,
+        .APB2CLKDivider = RCC_HCLK_DIV1,
+        .APB3CLKDivider = RCC_HCLK_DIV1
+    };
 
-    check(HAL_RCC_ClockConfig(&RCC_ClkInitStruct, FLASH_LATENCY_5), "Clock config");
-    HAL_RCC_MCOConfig(RCC_MCO2, RCC_MCO2SOURCE_SYSCLK, RCC_MCODIV_1);
+    check(HAL_RCC_ClockConfig(&clocks, FLASH_LATENCY_5), "Clock config");
 }

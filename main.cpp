@@ -2,12 +2,12 @@
 #include <stm32h5xx_nucleo.h>
 #include <stdio.h>
 
-ADC_HandleTypeDef & adc_init();
-DMA_HandleTypeDef & dma_init();
+ADC_HandleTypeDef * adc_init();
+DMA_HandleTypeDef * dma_init();
 void clock_init();
 
-auto &adc_handle = adc_init();
-auto &dma_handle = dma_init();
+ADC_HandleTypeDef * adc_handle{};
+DMA_HandleTypeDef * dma_handle{};
 
 const auto adc_ref_voltage = 3300;
 volatile uint32_t adc_error = 0;
@@ -19,13 +19,12 @@ uint16_t buffer[buflen];
 
 extern "C" void ADC1_IRQHandler()
 {
-    HAL_ADC_IRQHandler(&adc_handle);
+    HAL_ADC_IRQHandler(adc_handle);
 }
 
 extern "C" void GPDMA1_Channel0_IRQHandler()
 {
-    HAL_DMA_IRQHandler(&dma_handle);
-    HAL_ADC_IRQHandler(&adc_handle);
+    HAL_DMA_IRQHandler(dma_handle);
 }
 
 extern "C" void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
@@ -51,7 +50,6 @@ extern "C" void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *hadc)
     adc_error = hadc->ErrorCode;
 }
 
-
 int main(void)
 {
     HAL_Init();
@@ -67,12 +65,14 @@ int main(void)
     
     printf("%s\n", BSP_GetBoardName());
 
-    adc_handle.DMA_Handle = &dma_handle;
-    dma_handle.Parent = &adc_handle;
+    adc_handle = adc_init();
+    dma_handle = dma_init();
+    adc_handle->DMA_Handle = dma_handle;
+    dma_handle->Parent = adc_handle;
 
     HAL_ICACHE_Enable();
 
-    HAL_ADC_Start_DMA(&adc_handle, (uint32_t *) &buffer, buflen);
+    HAL_ADC_Start_DMA(adc_handle, (uint32_t *) &buffer, buflen);
 
     for (;;)
     {
