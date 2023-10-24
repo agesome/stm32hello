@@ -22,7 +22,7 @@ ADC_HandleTypeDef * adc_init()
         .Instance = ADC1,
         .Init = 
         {
-            .ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV2,
+            .ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV1,
             .Resolution = ADC_RESOLUTION_12B,
             .EOCSelection = ADC_EOC_SEQ_CONV,
             .ContinuousConvMode = ENABLE,
@@ -36,7 +36,7 @@ ADC_HandleTypeDef * adc_init()
     {
         .Channel = ADC_CHANNEL_0,
         .Rank = ADC_REGULAR_RANK_1,
-        .SamplingTime = ADC_SAMPLETIME_2CYCLES_5,
+        .SamplingTime = ADC_SAMPLETIME_3CYCLES_5,
         .SingleDiff = ADC_SINGLE_ENDED,
         .OffsetNumber = ADC_OFFSET_NONE,
     };
@@ -62,7 +62,7 @@ DMA_HandleTypeDef * dma_init()
             .SrcDataWidth = DMA_SRC_DATAWIDTH_HALFWORD,
             .DestDataWidth = DMA_DEST_DATAWIDTH_HALFWORD,
             .SrcBurstLength = 1,
-            .DestBurstLength = 64, // ???
+            .DestBurstLength = 64,
             .TransferAllocatedPort = DMA_SRC_ALLOCATED_PORT0|DMA_DEST_ALLOCATED_PORT0
         }
     };

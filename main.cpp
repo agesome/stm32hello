@@ -11,10 +11,10 @@ DMA_HandleTypeDef * dma_handle{};
 
 const auto adc_ref_voltage = 3300;
 volatile uint32_t adc_error = 0;
-volatile uint64_t conversions = 0;
-volatile uint64_t adc_sum = 0;
+volatile uint32_t conversions = 0;
+volatile uint32_t adc_sum = 0;
 
-const size_t buflen = 1024;
+const size_t buflen = 12288;
 uint16_t buffer[buflen];
 
 extern "C" void ADC1_IRQHandler()
@@ -29,20 +29,23 @@ extern "C" void GPDMA1_Channel0_IRQHandler()
 
 extern "C" void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
+    uint32_t sum{};
     for (size_t i = buflen / 2; i < buflen; ++i)
     {
-        adc_sum += __LL_ADC_CALC_DATA_TO_VOLTAGE(adc_ref_voltage, buffer[i], LL_ADC_RESOLUTION_12B);
+        sum += __LL_ADC_CALC_DATA_TO_VOLTAGE(adc_ref_voltage, buffer[i], LL_ADC_RESOLUTION_12B);
     }
-    conversions += buflen / 2;
+    adc_sum = adc_sum + sum;
+    conversions = conversions + buflen;
 }
 
 extern "C" void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef *hadc)
 {
+    uint32_t sum{};
     for (size_t i = 0; i < buflen / 2; ++i)
     {
-        adc_sum += __LL_ADC_CALC_DATA_TO_VOLTAGE(adc_ref_voltage, buffer[i], LL_ADC_RESOLUTION_12B);
+        sum += __LL_ADC_CALC_DATA_TO_VOLTAGE(adc_ref_voltage, buffer[i], LL_ADC_RESOLUTION_12B);
     }
-    conversions += buflen / 2;
+    adc_sum = adc_sum + sum;
 }
 
 extern "C" void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *hadc)
@@ -72,6 +75,7 @@ int main(void)
 
     HAL_ICACHE_Enable();
 
+    uint32_t tick = HAL_GetTick();
     HAL_ADC_Start_DMA(adc_handle, (uint32_t *) &buffer, buflen);
 
     for (;;)
@@ -82,10 +86,10 @@ int main(void)
             printf("ADC error: %lu\n", adc_error);
             adc_error = HAL_ADC_ERROR_NONE;
         }
-        printf("conv/sec: %llu\n", conversions);
-        printf("adc avg: %llu\n", adc_sum / conversions);
-        conversions = 0;
-        adc_sum = 0;
+        printf("conv/msec: %lu\n", conversions / (HAL_GetTick() - tick));
+        // printf("adc avg: %llu\n", adc_sum / conversions);
+        // conversions = 0;
+        // adc_sum = 0;
     }
 
     return 0;
