@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "iostream": "cpp"
+        "stdio.h": "c",
+        "__config_site": "cpp"
     }
 }

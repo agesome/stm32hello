@@ -1,29 +1,66 @@
 cmake_minimum_required(VERSION 3.16)
-set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/cmake/stm32_gcc.cmake)
+set(CMAKE_TOOLCHAIN_FILE ${CMAKE_CURRENT_SOURCE_DIR}/toolchain-arm-none-eabi-clang.cmake)
 
 project(hello C CXX ASM)
 set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_C_STANDARD 23)
 
-find_package(CMSIS COMPONENTS STM32H503 REQUIRED)
-find_package(HAL COMPONENTS STM32H503 REQUIRED)
+set(FREERTOS_CONFIG_FILE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src CACHE STRING "")
+set(FREERTOS_PORT GCC_ARM_CM33_NTZ_NONSECURE CACHE STRING "")
+add_subdirectory(3rdparty/freertos)
 
-set(CMAKE_INCLUDE_CURRENT_DIR TRUE)
-
-add_executable(hello main.cpp init.cpp stm32h5xx_nucleo.c stm32h5xx_it.c syscalls.c)
-target_link_libraries(hello
-        HAL::STM32::H5::PWREx
-        HAL::STM32::H5::ADC
-        HAL::STM32::H5::ADCEx
-        HAL::STM32::H5::DMA
-        HAL::STM32::H5::DMAEx
-        HAL::STM32::H5::ICACHE
-        HAL::STM32::H5::RCCEx
-        HAL::STM32::H5::EXTI
-        HAL::STM32::H5::GPIO
-        HAL::STM32::H5::UART
-        HAL::STM32::H5::CORTEX
-        CMSIS::STM32::H503RB
-        STM32::NoSys
+set(hal_sources
+    3rdparty/stmicro/hal/stm32h5xx_hal.c
+    3rdparty/stmicro/hal/stm32h5xx_hal_adc.c
+    3rdparty/stmicro/hal/stm32h5xx_hal_adc_ex.c
+    3rdparty/stmicro/hal/stm32h5xx_hal_cortex.c
+    3rdparty/stmicro/hal/stm32h5xx_hal_dma.c
+    3rdparty/stmicro/hal/stm32h5xx_hal_dma_ex.c
+    3rdparty/stmicro/hal/stm32h5xx_hal_gpio.c
+    3rdparty/stmicro/hal/stm32h5xx_hal_icache.c
+    3rdparty/stmicro/hal/stm32h5xx_hal_pwr.c
+    3rdparty/stmicro/hal/stm32h5xx_hal_pwr_ex.c
+    3rdparty/stmicro/hal/stm32h5xx_hal_rcc.c
+    3rdparty/stmicro/hal/stm32h5xx_hal_rcc_ex.c
+    3rdparty/stmicro/hal/stm32h5xx_hal_uart.c
+    3rdparty/stmicro/hal/stm32h5xx_hal_uart_ex.c
 )
-stm32_generate_hex_file(hello)
-stm32_print_size_of_target(hello)
+
+set(cmsis_sources
+    3rdparty/stmicro/cmsis/system_stm32h5xx.c
+)
+
+add_executable(hello
+    src/main.cpp
+    src/init.cpp
+    src/interrupts.c
+    src/syscalls.c
+    src/uart.c
+
+    ${hal_sources}
+    ${cmsis_sources}
+)
+
+target_include_directories(hello PRIVATE
+    src
+    3rdparty/stmicro/hal
+    3rdparty/stmicro/cmsis
+    3rdparty/stmicro/cmsis/Core/Include
+)
+
+target_link_libraries(hello
+    freertos_kernel crt0
+)
+target_compile_definitions(hello PRIVATE
+    STM32H5 STM32H503xx
+)
+target_link_options(hello PUBLIC -T${CMAKE_CURRENT_SOURCE_DIR}/src/pico.ld)
+# target_compile_options(hello PUBLIC -Oz -g)
+
+add_custom_target(hello_always_display_size
+    ALL COMMAND llvm-size "$<TARGET_FILE:hello>"
+    COMMENT "Target Sizes: "
+    DEPENDS hello
+)
+
+set_property(TARGET hello PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)

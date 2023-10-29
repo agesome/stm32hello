@@ -8,7 +8,8 @@
         "name": "(gdb) Launch",
         "type": "cppdbg",
         "request": "launch",
-        "program": "${workspaceFolder}/build/hello.elf",
+        "program": "${workspaceFolder}/build/hello",
+        "targetArchitecture": "arm",
         "avoidWindowsConsoleRedirection": true,
         "args": [],
         "stopAtEntry": false,
@@ -30,7 +31,7 @@
                 "text": "mon reset init"
             },
             {
-                "text": "file C:/dev/src/hello/build/hello.elf"
+                "text": "file C:/dev/src/hello/build/hello"
             },
             {
                 "text": "load"
