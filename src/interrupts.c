@@ -1,8 +1,13 @@
 #include <stdint.h>
 #include <stm32h5xx_hal.h>
 
+#include <FreeRTOS.h>
+#include <portasm.h>
+
 void _start(void);
 extern uint8_t __stack[];
+
+void SysTick_Handler();
 
 void hardfault_handler()
 {
@@ -24,10 +29,9 @@ void usagefault_handler()
     for(;;) {}
 }
 
-void SysTick_Handler();
 void systick_handler()
 {
-    // SysTick_Handler();
+    SysTick_Handler();
     HAL_IncTick();
 }
 
@@ -51,9 +55,9 @@ void (* const __interrupt_vector[256])(void) __attribute((aligned(128))) =
     entry(0x10, memmanage_handler),
     entry(0x14, busfault_handler),
     entry(0x18, usagefault_handler),
-    entry(0x2c, default_handler), // svc
+    entry(0x2c, SVC_Handler), // svc
     entry(0x30, default_handler), // debugmon
-    entry(0x38, default_handler), // pendsv
+    entry(0x38, PendSV_Handler), // pendsv
     entry(0x3c, systick_handler),
     [ADC1_IRQn + NVIC_USER_IRQ_OFFSET] = ADC1_IRQHandler,
     [GPDMA1_Channel0_IRQn + NVIC_USER_IRQ_OFFSET] = GPDMA1_Channel0_IRQHandler

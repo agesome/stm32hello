@@ -1,5 +1,8 @@
 #include <stdio.h>
+#include <stdbool.h>
 #include <stm32h5xx_hal.h>
+#include <FreeRTOS.h>
+#include <queue.h>
 
 static UART_HandleTypeDef uart = 
 {
@@ -12,6 +15,21 @@ static UART_HandleTypeDef uart =
         .ClockPrescaler = UART_PRESCALER_DIV1,
     }
 };
+
+QueueHandle_t uart_queue;
+
+void uart_task(void *arg)
+{
+    for(;;)
+    {
+        char *msg{};
+        if (xQueueReceive(uart_queue, &msg, portMAX_DELAY) == pdTRUE && msg != nullptr)
+        {
+            printf("%s\n", msg);
+            free(msg);
+        }
+    }
+}
 
 void uart_init()
 {
@@ -32,8 +50,11 @@ void uart_init()
     HAL_GPIO_Init(GPIOA, &gpio);
 
     HAL_UART_Init(&uart);
-}
 
+    uart_queue = xQueueCreate(64, sizeof(char*));
+    xTaskCreate(uart_task, "uart_io", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+    printf("UART init OK\n");
+}
 
 static int uart_putc(char c, FILE *)
 {

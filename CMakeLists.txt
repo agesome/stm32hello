@@ -7,6 +7,7 @@ set(CMAKE_C_STANDARD 23)
 
 set(FREERTOS_CONFIG_FILE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src CACHE STRING "")
 set(FREERTOS_PORT GCC_ARM_CM33_NTZ_NONSECURE CACHE STRING "")
+set(FREERTOS_HEAP 3)
 add_subdirectory(3rdparty/freertos)
 
 set(hal_sources
@@ -32,10 +33,12 @@ set(cmsis_sources
 
 add_executable(hello
     src/main.cpp
-    src/init.cpp
+    src/adcdma.cpp
+    src/clock.cpp
     src/interrupts.c
     src/syscalls.c
-    src/uart.c
+    src/uart.cpp
+    src/util.cpp
 
     ${hal_sources}
     ${cmsis_sources}
@@ -54,13 +57,12 @@ target_link_libraries(hello
 target_compile_definitions(hello PRIVATE
     STM32H5 STM32H503xx
 )
-target_link_options(hello PUBLIC -T${CMAKE_CURRENT_SOURCE_DIR}/src/pico.ld)
-# target_compile_options(hello PUBLIC -Oz -g)
 
-add_custom_target(hello_always_display_size
-    ALL COMMAND llvm-size "$<TARGET_FILE:hello>"
-    COMMENT "Target Sizes: "
-    DEPENDS hello
-)
+target_link_options(hello PUBLIC -T${CMAKE_CURRENT_SOURCE_DIR}/src/pico.ld)
+set_target_properties(hello PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/pico.ld)
 
 set_property(TARGET hello PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+# target_compile_options(hello PUBLIC -Oz -g)
+
+add_custom_target(display_size ALL COMMAND llvm-size "$<TARGET_FILE:hello>" DEPENDS hello COMMENT "Binary size:")
+

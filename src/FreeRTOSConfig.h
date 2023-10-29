@@ -6,18 +6,17 @@
 #define configUSE_TICKLESS_IDLE                 0
 #define configCPU_CLOCK_HZ                      250000000
 #define configTICK_RATE_HZ                      1000
-#define configMAX_PRIORITIES                    5
-#define configMINIMAL_STACK_SIZE                128
-#define configMAX_TASK_NAME_LEN                 16
+#define configMAX_PRIORITIES                    10
+#define configMINIMAL_STACK_SIZE                512
+#define configMAX_TASK_NAME_LEN                 32
 #define configUSE_16_BIT_TICKS                  0
-#define configTICK_TYPE_WIDTH_IN_BITS           TICK_TYPE_WIDTH_16_BITS
+#define configTICK_TYPE_WIDTH_IN_BITS           TICK_TYPE_WIDTH_32_BITS
 #define configIDLE_SHOULD_YIELD                 1
 #define configUSE_TASK_NOTIFICATIONS            1
 #define configTASK_NOTIFICATION_ARRAY_ENTRIES   3
-#define configUSE_MUTEXES                       0
-#define configUSE_RECURSIVE_MUTEXES             0
-#define configUSE_COUNTING_SEMAPHORES           0
-#define configUSE_ALTERNATIVE_API               0 /* Deprecated! */
+#define configUSE_MUTEXES                       1
+#define configUSE_RECURSIVE_MUTEXES             1
+#define configUSE_COUNTING_SEMAPHORES           1
 #define configQUEUE_REGISTRY_SIZE               10
 #define configUSE_QUEUE_SETS                    0
 #define configUSE_TIME_SLICING                  0
@@ -32,7 +31,7 @@
 /* Memory allocation related definitions. */
 #define configSUPPORT_STATIC_ALLOCATION             0
 #define configSUPPORT_DYNAMIC_ALLOCATION            1
-#define configTOTAL_HEAP_SIZE                       1024
+#define configTOTAL_HEAP_SIZE                       8192
 #define configAPPLICATION_ALLOCATED_HEAP            0
 #define configSTACK_ALLOCATION_FROM_SEPARATE_HEAP   0
 
@@ -63,26 +62,10 @@
 /* Define to trap errors during development. */
 // #define configASSERT( ( x ) ) if( ( x ) == 0 ) vAssertCalled( __FILE__, __LINE__ )
 
-/* FreeRTOS MPU specific definitions. */
-#define configINCLUDE_APPLICATION_DEFINED_PRIVILEGED_FUNCTIONS 0
-#define configTOTAL_MPU_REGIONS                                8 /* Default value. */
-#define configTEX_S_C_B_FLASH                                  0x07UL /* Default value. */
-#define configTEX_S_C_B_SRAM                                   0x07UL /* Default value. */
-#define configENFORCE_SYSTEM_CALLS_FROM_KERNEL_ONLY            1
-#define configALLOW_UNPRIVILEGED_CRITICAL_SECTIONS             1
-#define configENABLE_ERRATA_837070_WORKAROUND                  1
-#define configUSE_MPU_WRAPPERS_V1                              0
-#define configPROTECTED_KERNEL_OBJECT_POOL_SIZE                10
-#define configSYSTEM_CALL_STACK_SIZE                           128
-
-/* ARMv8-M secure side port related definitions. */
-#define secureconfigMAX_SECURE_CONTEXTS         5
-
 #define configENABLE_FPU 1
 #define configENABLE_MPU 0
 #define configENABLE_TRUSTZONE 0
 #define configMAX_SYSCALL_INTERRUPT_PRIORITY 3
-
 
 /* Optional functions - most linkers will remove unused functions anyway. */
 #define INCLUDE_vTaskPrioritySet                1
