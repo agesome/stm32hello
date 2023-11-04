@@ -46,6 +46,8 @@
         "variant": "cpp",
         "vector": "cpp",
         "algorithm": "cpp",
-        "__memory": "c"
+        "__memory": "c",
+        "span": "cpp",
+        "spi.h": "c"
     }
 }

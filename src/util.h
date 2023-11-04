@@ -7,6 +7,7 @@ extern "C" {
 void check(HAL_StatusTypeDef status, const char desc[]);
 void check_silent(HAL_StatusTypeDef status);
 void message(const char *format, ...);
+uint8_t crc7(const uint8_t *data, size_t data_len);
 
 #ifdef __cplusplus
 }

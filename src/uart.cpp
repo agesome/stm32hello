@@ -9,7 +9,7 @@ static UART_HandleTypeDef uart =
     .Instance = USART3,
     .Init = 
     {
-        .BaudRate = 115200,
+        .BaudRate = 250000,
         .Mode = UART_MODE_TX_RX,
         .OverSampling = UART_OVERSAMPLING_8,
         .ClockPrescaler = UART_PRESCALER_DIV1,
@@ -38,21 +38,17 @@ void uart_init()
 
     GPIO_InitTypeDef gpio = 
     {
-        .Pin = GPIO_PIN_4,
+        .Pin = GPIO_PIN_3 | GPIO_PIN_4,
         .Mode = GPIO_MODE_AF_PP,
         .Pull = GPIO_PULLUP,
         .Speed = GPIO_SPEED_FREQ_HIGH,
         .Alternate = GPIO_AF13_USART3
     };
     HAL_GPIO_Init(GPIOA, &gpio);
-
-    gpio.Pin = GPIO_PIN_3;
-    HAL_GPIO_Init(GPIOA, &gpio);
-
     HAL_UART_Init(&uart);
 
     uart_queue = xQueueCreate(64, sizeof(char*));
-    xTaskCreate(uart_task, "uart_io", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
+    xTaskCreate(uart_task, "uart_io", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 1, NULL);
     printf("UART init OK\n");
 }
 

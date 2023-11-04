@@ -17,7 +17,7 @@ void clock_init()
             .PLLM = 12,
             .PLLN = 250,
             .PLLP = 2,
-            .PLLQ = 2,
+            .PLLQ = 5,
             .PLLR = 2,
             .PLLRGE = RCC_PLL1_VCIRANGE_1,
             .PLLVCOSEL = RCC_PLL1_VCORANGE_WIDE,

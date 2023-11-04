@@ -7,11 +7,14 @@
 #include <task.h>
 
 #include "util.h"
+#include "spi.h"
+#include "sdcard.h"
 
 void adc_init();
 void dma_init();
 void clock_init();
 void uart_init();
+void lcd_init();
 
 const auto adc_ref_voltage = 3300;
 volatile uint32_t adc_error = 0;
@@ -49,26 +52,43 @@ extern "C" void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *hadc)
 
 void mainloop(void *arg)
 {
+    message("enter mainloop");
     for(;;)
     {
         vTaskDelay(500);
-        message("hello %d", 500);
     }
 }
+
+void spi_change_speed();
 
 void init_task(void *arg)
 {
     clock_init();
+    HAL_Init();
     uart_init();
-    HAL_InitTick(TICK_INT_PRIORITY);
 
-    adc_init();
-    dma_init();
+    // adc_init();
+    // dma_init();
 
     HAL_ICACHE_Enable();
     
-    extern ADC_HandleTypeDef adc_handle;
-    HAL_ADC_Start_DMA(&adc_handle, (uint32_t *) &buffer, buflen);
+    // extern ADC_HandleTypeDef adc_handle;
+    // HAL_ADC_Start_DMA(&adc_handle, (uint32_t *) &buffer, buflen);
+
+    spi_init();
+    lcd_init();
+
+#if 0
+    if (sdcard_init())
+    {
+        spi_change_speed();
+        sdcard_get_cid();
+    }
+    else
+    {
+        message("sdcard init NOK");
+    }
+#endif
 
     xTaskCreate(mainloop, "mainloop", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
 
@@ -77,7 +97,7 @@ void init_task(void *arg)
 
 int main(void)
 {
-    xTaskCreate(init_task, "init_task", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 1, NULL);
+    xTaskCreate(init_task, "init_task", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 2, NULL);
 
     vTaskStartScheduler();
 

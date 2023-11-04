@@ -25,6 +25,8 @@ set(hal_sources
     3rdparty/stmicro/hal/stm32h5xx_hal_rcc_ex.c
     3rdparty/stmicro/hal/stm32h5xx_hal_uart.c
     3rdparty/stmicro/hal/stm32h5xx_hal_uart_ex.c
+    3rdparty/stmicro/hal/stm32h5xx_hal_spi.c
+    3rdparty/stmicro/hal/stm32h5xx_hal_spi_ex.c
 )
 
 set(cmsis_sources
@@ -39,6 +41,10 @@ add_executable(hello
     src/syscalls.c
     src/uart.cpp
     src/util.cpp
+    src/lcd.cpp
+    src/sdcard.cpp
+    src/freertos_hooks.c
+    src/spi.cpp
 
     ${hal_sources}
     ${cmsis_sources}
@@ -52,7 +58,8 @@ target_include_directories(hello PRIVATE
 )
 
 target_link_libraries(hello
-    freertos_kernel crt0
+    freertos_kernel
+    crt0
 )
 target_compile_definitions(hello PRIVATE
     STM32H5 STM32H503xx
@@ -62,7 +69,7 @@ target_link_options(hello PUBLIC -T${CMAKE_CURRENT_SOURCE_DIR}/src/pico.ld)
 set_target_properties(hello PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/pico.ld)
 
 set_property(TARGET hello PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
-# target_compile_options(hello PUBLIC -Oz -g)
+target_compile_options(hello PUBLIC -g3)
 
 add_custom_target(display_size ALL COMMAND llvm-size "$<TARGET_FILE:hello>" DEPENDS hello COMMENT "Binary size:")
 

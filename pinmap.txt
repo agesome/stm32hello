@@ -1,0 +1,14 @@
+SCLK    D13 PA5 SPI clock
+MISO    D12 PA6 SPI data input
+MOSI    D11 PA7 SPI data output
+
+LCD_CS  D10 PC9 LCD chip select
+SD_CS   D5  PB4 Micro SD card chipselect
+TP_CS   D4  PB5 Touch panel chipselect
+
+LCD_BL  D9  PC6 LCD back light
+LCD_RST D8  PC7 LCD reset
+LCD_DC  D7  PA8 LCD data/command selection
+
+TP_BUSY D6  PB10 Touch panel busy
+TP_IRQ  D3  PB3 Touch panel interrupt
