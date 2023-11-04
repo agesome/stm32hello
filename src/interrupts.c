@@ -1,8 +1,11 @@
 #include <stdint.h>
+#include <stdio.h>
 #include <stm32h5xx_hal.h>
 
 #include <FreeRTOS.h>
 #include <portasm.h>
+
+#include <lvgl.h>
 
 void _start(void);
 extern uint8_t __stack[];
@@ -11,21 +14,25 @@ void SysTick_Handler();
 
 void hardfault_handler()
 {
+    printf("%s\n", __FUNCTION__);
     for(;;) {}
 }
 
 void memmanage_handler()
 {
+    printf("%s\n", __FUNCTION__);
     for(;;) {}
 }
 
 void busfault_handler()
 {
+    printf("%s\n", __FUNCTION__);
     for(;;) {}
 }
 
 void usagefault_handler()
 {
+    printf("%s\n", __FUNCTION__);
     for(;;) {}
 }
 
@@ -33,10 +40,12 @@ void systick_handler()
 {
     SysTick_Handler();
     HAL_IncTick();
+    lv_tick_inc(1);
 }
 
 void default_handler()
 {
+    printf("%s\n", __FUNCTION__);
     for(;;) {}
 }
 

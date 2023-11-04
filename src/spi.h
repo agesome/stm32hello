@@ -24,7 +24,7 @@ constexpr auto kSpiTimeout{5};
 void spi_init();
 
 template<size_t N>
-void spi_write(const bytes<N> data)
+void spi_write(const bytes<N> &data)
 {
     extern SPI_HandleTypeDef spi;
 

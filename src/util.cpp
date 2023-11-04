@@ -28,8 +28,8 @@ void check_silent(HAL_StatusTypeDef status)
 
 void message(const char *format, ...)
 {
-    const size_t log_buflen = 512;
-    static char buf[log_buflen];
+    const size_t log_buflen = 128;
+    char buf[log_buflen];
 
     va_list args;
     va_start(args, format);

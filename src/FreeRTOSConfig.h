@@ -7,16 +7,16 @@
 #define configCPU_CLOCK_HZ                      250000000
 #define configTICK_RATE_HZ                      1000
 #define configMAX_PRIORITIES                    10
-#define configMINIMAL_STACK_SIZE                512
+#define configMINIMAL_STACK_SIZE                128
 #define configMAX_TASK_NAME_LEN                 32
 #define configUSE_16_BIT_TICKS                  0
 #define configTICK_TYPE_WIDTH_IN_BITS           TICK_TYPE_WIDTH_32_BITS
 #define configIDLE_SHOULD_YIELD                 1
 #define configUSE_TASK_NOTIFICATIONS            1
-#define configTASK_NOTIFICATION_ARRAY_ENTRIES   3
+#define configTASK_NOTIFICATION_ARRAY_ENTRIES   1
 #define configUSE_MUTEXES                       1
-#define configUSE_RECURSIVE_MUTEXES             1
-#define configUSE_COUNTING_SEMAPHORES           1
+#define configUSE_RECURSIVE_MUTEXES             0
+#define configUSE_COUNTING_SEMAPHORES           0
 #define configQUEUE_REGISTRY_SIZE               10
 #define configUSE_QUEUE_SETS                    0
 #define configUSE_TIME_SLICING                  0
@@ -26,10 +26,9 @@
 #define configUSE_MINI_LIST_ITEM                1
 #define configSTACK_DEPTH_TYPE                  uint16_t
 #define configMESSAGE_BUFFER_LENGTH_TYPE        size_t
-#define configHEAP_CLEAR_MEMORY_ON_FREE         1
+#define configHEAP_CLEAR_MEMORY_ON_FREE         0
 
 /* Memory allocation related definitions. */
-// #define configSUPPORT_STATIC_ALLOCATION             0
 #define configSUPPORT_DYNAMIC_ALLOCATION            1
 
 /* Hook function related definitions. */
@@ -50,7 +49,7 @@
 #define configMAX_CO_ROUTINE_PRIORITIES         1
 
 /* Software timer related definitions. */
-#define configUSE_TIMERS                        1
+#define configUSE_TIMERS                        0
 #define configTIMER_TASK_PRIORITY               3
 #define configTIMER_QUEUE_LENGTH                10
 #define configTIMER_TASK_STACK_DEPTH            configMINIMAL_STACK_SIZE

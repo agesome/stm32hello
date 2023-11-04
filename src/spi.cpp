@@ -113,6 +113,7 @@ void spi_init()
     HAL_GPIO_Init(kLcdChipSelectPort, &lcd_chipselect);
 
     LL_SPI_Enable(spi.Instance);
+    message("SPI enabled");
 }
 
 static uint16_t chipselect_pins[] = {kLcdChipSelectPin, kTouchChipSelectPin, kSdCardChipSelectPin};

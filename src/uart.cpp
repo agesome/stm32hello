@@ -48,7 +48,7 @@ void uart_init()
     HAL_UART_Init(&uart);
 
     uart_queue = xQueueCreate(64, sizeof(char*));
-    xTaskCreate(uart_task, "uart_io", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY + 1, NULL);
+    xTaskCreate(uart_task, "uart_io", 64, NULL, tskIDLE_PRIORITY + 1, NULL);
     printf("UART init OK\n");
 }
 

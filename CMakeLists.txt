@@ -7,8 +7,10 @@ set(CMAKE_C_STANDARD 23)
 
 set(FREERTOS_CONFIG_FILE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src CACHE STRING "")
 set(FREERTOS_PORT GCC_ARM_CM33_NTZ_NONSECURE CACHE STRING "")
-set(FREERTOS_HEAP 3)
+set(FREERTOS_HEAP 3 CACHE STRING "")
 add_subdirectory(3rdparty/freertos)
+
+add_subdirectory(3rdparty/lvgl EXCLUDE_FROM_ALL)
 
 set(hal_sources
     3rdparty/stmicro/hal/stm32h5xx_hal.c
@@ -59,11 +61,14 @@ target_include_directories(hello PRIVATE
 
 target_link_libraries(hello
     freertos_kernel
+    lvgl
     crt0
 )
 target_compile_definitions(hello PRIVATE
     STM32H5 STM32H503xx
 )
+
+target_include_directories(lvgl PRIVATE src)
 
 target_link_options(hello PUBLIC -T${CMAKE_CURRENT_SOURCE_DIR}/src/pico.ld)
 set_target_properties(hello PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/pico.ld)
