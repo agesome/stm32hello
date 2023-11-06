@@ -12,3 +12,11 @@ void vApplicationStackOverflowHook(TaskHandle_t pxTask, char *pcTaskName)
 {
     printf("stack overflow in task: %s\n", pcTaskName);
 }
+
+void assert_failed()
+{
+    for (;;)
+    {
+        asm("nop");
+    }
+}

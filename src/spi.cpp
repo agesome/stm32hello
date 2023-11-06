@@ -23,24 +23,15 @@ SPI_HandleTypeDef spi =
     .Init = 
     {
         .Mode = SPI_MODE_MASTER,
-        .DataSize = SPI_DATASIZE_8BIT,
+        .DataSize = SPI_DATASIZE_16BIT,
         .NSS = SPI_NSS_SOFT,
-        .BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2,
+        .BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4,
     }
 };
 
 void spi_change_speed()
 {
     LL_SPI_SetBaudRatePrescaler(SPI1, SPI_BAUDRATEPRESCALER_128);
-}
-
-void spi_write(const uint8_t *data, size_t size)
-{
-    extern SPI_HandleTypeDef spi;
-    if (HAL_SPI_Transmit(&spi, data, size, kSpiTimeout) != HAL_OK)
-    {
-        message("spi_write %u bytes NOK!", size);
-    }
 }
 
 void spi_write(uint16_t data)
@@ -52,7 +43,6 @@ void spi_write(uint16_t data)
     LL_SPI_TransmitData16(spi.Instance, data);
     while(!LL_SPI_IsActiveFlag_TXC(spi.Instance));
 }
-
 
 uint8_t spi_read_byte()
 {
@@ -66,7 +56,7 @@ void spi_init()
     {
         .Pin = kSpiMosiPin | kSpiMisoPin,
         .Mode = GPIO_MODE_AF_PP,
-        .Speed = GPIO_SPEED_FREQ_HIGH,
+        .Speed = GPIO_SPEED_FREQ_VERY_HIGH,
         .Alternate = GPIO_AF5_SPI1,
     };
     HAL_GPIO_Init(kSpiPort, &data);
@@ -75,8 +65,7 @@ void spi_init()
     {
         .Pin = kSpiClkPin,
         .Mode = GPIO_MODE_AF_PP,
-        .Pull = GPIO_PULLDOWN,
-        .Speed = GPIO_SPEED_FREQ_HIGH,
+        .Speed = GPIO_SPEED_FREQ_VERY_HIGH,
         .Alternate = GPIO_AF5_SPI1,
     };
     HAL_GPIO_Init(kSpiPort, &spiclk);

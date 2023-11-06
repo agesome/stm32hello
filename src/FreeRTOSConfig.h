@@ -7,7 +7,7 @@
 #define configCPU_CLOCK_HZ                      250000000
 #define configTICK_RATE_HZ                      1000
 #define configMAX_PRIORITIES                    10
-#define configMINIMAL_STACK_SIZE                128
+#define configMINIMAL_STACK_SIZE                64
 #define configMAX_TASK_NAME_LEN                 32
 #define configUSE_16_BIT_TICKS                  0
 #define configTICK_TYPE_WIDTH_IN_BITS           TICK_TYPE_WIDTH_32_BITS
@@ -34,7 +34,7 @@
 /* Hook function related definitions. */
 #define configUSE_IDLE_HOOK                     0
 #define configUSE_TICK_HOOK                     0
-#define configCHECK_FOR_STACK_OVERFLOW          1
+#define configCHECK_FOR_STACK_OVERFLOW          2
 #define configUSE_MALLOC_FAILED_HOOK            1
 #define configUSE_DAEMON_TASK_STARTUP_HOOK      0
 #define configUSE_SB_COMPLETED_CALLBACK         0
@@ -54,9 +54,9 @@
 #define configTIMER_QUEUE_LENGTH                10
 #define configTIMER_TASK_STACK_DEPTH            configMINIMAL_STACK_SIZE
 
-
 /* Define to trap errors during development. */
-// #define configASSERT( ( x ) ) if( ( x ) == 0 ) vAssertCalled( __FILE__, __LINE__ )
+void assert_failed();
+#define configASSERT( x ) if((x) == 0) assert_failed()
 
 #define configENABLE_FPU 1
 #define configENABLE_MPU 0

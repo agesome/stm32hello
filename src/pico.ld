@@ -7,4 +7,4 @@ __ram_size = 32K;
 __stack_size = 2k;
 __heap_size_min = 28K;
 
-INCLUDE picolibc.ld
+INCLUDE picolibcpp.ld

@@ -14,25 +14,21 @@ void SysTick_Handler();
 
 void hardfault_handler()
 {
-    printf("%s\n", __FUNCTION__);
     for(;;) {}
 }
 
 void memmanage_handler()
 {
-    printf("%s\n", __FUNCTION__);
     for(;;) {}
 }
 
 void busfault_handler()
 {
-    printf("%s\n", __FUNCTION__);
     for(;;) {}
 }
 
 void usagefault_handler()
 {
-    printf("%s\n", __FUNCTION__);
     for(;;) {}
 }
 
@@ -45,7 +41,6 @@ void systick_handler()
 
 void default_handler()
 {
-    printf("%s\n", __FUNCTION__);
     for(;;) {}
 }
 

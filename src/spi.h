@@ -24,30 +24,17 @@ constexpr auto kSpiTimeout{5};
 void spi_init();
 
 template<size_t N>
-void spi_write(const bytes<N> &data)
+void spi_write(const bytes<N> data)
 {
     extern SPI_HandleTypeDef spi;
 
-#if 1
-    LL_SPI_StartMasterTransfer(spi.Instance);
-
-    for (auto byte : data)
-    {
-        while(!LL_SPI_IsActiveFlag_TXP(spi.Instance));
-        LL_SPI_TransmitData8(spi.Instance, byte);
-    }
-    while(!LL_SPI_IsActiveFlag_TXC(spi.Instance));
-#else
     if (HAL_SPI_Transmit(&spi, data.data(), data.size(), kSpiTimeout) != HAL_OK)
     {
         message("spi_write %u bytes NOK!", N);
     }
-#endif
 }
 
 void spi_write(uint16_t data);
-
-void spi_write(const uint8_t *data, size_t size);
 
 template<size_t N>
 bytes<N> spi_read()

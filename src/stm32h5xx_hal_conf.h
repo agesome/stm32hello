@@ -177,14 +177,14 @@ in voltage and temperature.*/
 #define  VDD_VALUE                  3300UL /*!< Value of VDD in mv */
 #define  TICK_INT_PRIORITY          ((1UL<<__NVIC_PRIO_BITS) - 1UL)  /*!< tick interrupt priority (lowest by default) */
 #define  USE_RTOS                   0U
-#define  PREFETCH_ENABLE            0U               /*!< Enable prefetch */
+#define  PREFETCH_ENABLE            1U               /*!< Enable prefetch */
 
 /* ############################################ Assert Selection #################################################### */
 /**
   * @brief Uncomment the line below to expanse the "assert_param" macro in the
   *        HAL drivers code
   */
-/* #define USE_FULL_ASSERT    1U */
+#define USE_FULL_ASSERT    1U
 
 /* ############################################ Register callback feature configuration ############################# */
 /**
@@ -474,9 +474,9 @@ in voltage and temperature.*/
   *         If expr is true, it returns no value.
   * @retval None
   */
-#define assert_param(expr) ((expr) ? (void)0U : assert_failed((uint8_t *)__FILE__, __LINE__))
+#define assert_param(expr) ((expr) ? (void)0U : assert_failed())
 /* Exported functions ----------------------------------------------------------------------------------------------- */
-void assert_failed(uint8_t *file, uint32_t line);
+void assert_failed();
 #else
 #define assert_param(expr) ((void)0U)
 #endif /* USE_FULL_ASSERT */

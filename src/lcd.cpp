@@ -24,12 +24,12 @@ enum class Mode
 union pixel
 {
     pixel(uint8_t r, uint8_t g, uint8_t b)
-    : color{r, g, b} {}
+    : color{b, g, r} {}
     struct __attribute__((packed))
     {
+        uint8_t b:5;
+        uint8_t g:6;
         uint8_t r:5;
-        uint8_t b:6;
-        uint8_t g:5;
     } color;
     uint16_t value;
 };
@@ -94,21 +94,21 @@ static void send(uint8_t cmd)
 {
     chipselect_low(SpiDevice::Display);
     mode(Mode::Command);
-    spi_write(bytes{0, cmd});
+    spi_write(cmd);
     chipselect_high(SpiDevice::Display);
 }
 
 template<size_t N>
-static std::enable_if<(N > 0)>::type send(uint8_t cmd, bytes<N> d)
+static std::enable_if<(N > 0)>::type send(uint8_t cmd, bytes<N> data)
 {
     send(cmd);
+    chipselect_low(SpiDevice::Display);
     mode(Mode::Data);
-    for (const auto byte : d)
+    for (const auto byte : data)
     {
-        chipselect_low(SpiDevice::Display);
-        spi_write(bytes{0, byte});
-        chipselect_high(SpiDevice::Display);
+        spi_write(byte);
     }
+    chipselect_high(SpiDevice::Display);
 }
 
 static void select(uint16_t ystart, uint16_t xstart, uint16_t yend, uint16_t xend)
@@ -122,14 +122,15 @@ uint16_t color565(uint8_t r, uint8_t g, uint8_t b)
     return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | ((b & 0xF8) >> 3);
 }
 
-static void fill(const pixel p)
+static void fill(pixel p)
 {
+    extern SPI_HandleTypeDef spi;
     send(0x2c);
-    mode(Mode::Data);
     chipselect_low(SpiDevice::Display);
+    mode(Mode::Data);
     for (auto i = 0; i < kWidth * kHeight; ++i)
     {
-        spi_write(color565(0x0, 0x0, 0xff));
+        spi_write(p.value);
     }
     chipselect_high(SpiDevice::Display);
 }
@@ -138,25 +139,18 @@ void flush(lv_disp_drv_t * disp, const lv_area_t * area, lv_color_t * color_p)
 {
     int32_t x, y;
 
-    // taskENTER_CRITICAL();
     select(area->y1, area->x1, area->y2, area->x2);
     send(0x2c);
-    mode(Mode::Data);
     chipselect_low(SpiDevice::Display);
-    pixel p{0, 0, 0};
+    mode(Mode::Data);
     for(y = area->y1; y <= area->y2; y++) {
         for(x = area->x1; x <= area->x2; x++) {
-            p.color.r = color_p->ch.red;
-            p.color.g = color_p->ch.green;
-            p.color.b = color_p->ch.blue;
-            // spi_write(color_p->full);
-            spi_write(p.value);
+            spi_write(color_p->full);
             color_p++;
         }
     }
     chipselect_high(SpiDevice::Display);
     lv_disp_flush_ready(disp);
-    // taskEXIT_CRITICAL();
 }
 
 static void update_task(void*)
@@ -165,12 +159,9 @@ static void update_task(void*)
     for (;;)
     {
         lv_timer_handler();
-        // taskYIELD();
         vTaskDelay(1);
     }
 }
-
-#include <cstdio>
 
 void lcd_init()
 {
@@ -191,14 +182,16 @@ void lcd_init()
     send(0x3a, bytes{0x05});
 
     send(0xB6, bytes{0x00, 0x02, 0xff});
-    send(0x36, bytes{(1 << 5) | (1 << 4)});
+    send(0x36, bytes{(1 << 5) | (1 << 3)});
 
     send(0x11);
     vTaskDelay(120);
     send(0x29);
 
     backlight(true);
-    
+
+    message("LCD init done");
+
 #if 1
     message("start init");
     lv_init();
@@ -220,7 +213,7 @@ void lcd_init()
     disp_drv.ver_res = kHeight;
     auto *disp = lv_disp_drv_register(&disp_drv);
 
-    disp->theme = lv_theme_basic_init(disp);
+    // disp->theme = lv_theme_basic_init(disp);
 
     message("init done");
 
@@ -244,6 +237,7 @@ void lcd_init()
 
     auto *meter = lv_meter_create(lv_scr_act());
     lv_obj_center(meter);
+    lv_obj_set_size(meter, 320, 320); 
     lv_meter_scale_t * scale = lv_meter_add_scale(meter);
     lv_meter_set_scale_ticks(meter, scale, 41, 2, 10, lv_palette_main(LV_PALETTE_GREY));
     lv_meter_set_scale_major_ticks(meter, scale, 8, 4, 15, lv_color_black(), 10);
@@ -275,14 +269,14 @@ void lcd_init()
     /*Add a needle line indicator*/
     indic = lv_meter_add_needle_line(meter, scale, 4, lv_palette_main(LV_PALETTE_GREY), -10);
 
-    xTaskCreate(update_task, "update_task", 512, NULL, tskIDLE_PRIORITY + 1, NULL);
+    xTaskCreate(update_task, "update_task", 1024, NULL, tskIDLE_PRIORITY + 1, NULL);
 
     static char buf[64];
     int v = 0;
     bool d = false;
     for(;;)
     {
-        message("%d", v);
+        // message("%d", v);
         lv_meter_set_indicator_value(meter, indic, v);
         // lv_bar_set_value(bar, p, LV_ANIM_OFF);
         // lv_led_set_brightness(led, p);
@@ -290,14 +284,15 @@ void lcd_init()
         // sprintf(buf, "value: %d", p);
         // lv_label_set_text(label, buf);
         // lv_label_set_text_static(label, buf);
-        lv_label_set_text_fmt(label, "value: %d", v);
+        // lv_label_set_text_fmt(label, "value: %d", v);
         // taskYIELD();
         d ? --v : ++v;
         if (v == 100)
             d = true;
         if (v == 0)
             d = false;
-        vTaskDelay(1);
+        if (v % 5 == 0)
+            vTaskDelay(1);
         // lv_label_set_text(label, "Down");
     }
 
@@ -314,9 +309,7 @@ void lcd_init()
         // message("%d", i % 100);
     // }
 
-#endif
-
-#if 0
+#else
     select(0, 0, 320, 480);
 
     for (;;)
@@ -325,13 +318,13 @@ void lcd_init()
         fill(kColorRed);
         vTaskDelay(1000);
    
-        // message("green");
-        // fill(kColorGreen);
-        // vTaskDelay(1000);
+        message("green");
+        fill(kColorGreen);
+        vTaskDelay(1000);
 
-        // message("blue");
-        // fill(kColorBlue);
-        // vTaskDelay(1000);
+        message("blue");
+        fill(kColorBlue);
+        vTaskDelay(1000);
     }
 #endif
 }

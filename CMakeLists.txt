@@ -5,6 +5,9 @@ project(hello C CXX ASM)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_C_STANDARD 23)
 
+# set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wframe-larger-than=32  -fstack-protector-strong -Oz")
+# set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -Wframe-larger-than=32  -fstack-protector-strong -Oz")
+
 set(FREERTOS_CONFIG_FILE_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/src CACHE STRING "")
 set(FREERTOS_PORT GCC_ARM_CM33_NTZ_NONSECURE CACHE STRING "")
 set(FREERTOS_HEAP 3 CACHE STRING "")
@@ -44,8 +47,8 @@ add_executable(hello
     src/uart.cpp
     src/util.cpp
     src/lcd.cpp
-    src/sdcard.cpp
-    src/freertos_hooks.c
+    # src/sdcard.cpp
+    src/hooks.c
     src/spi.cpp
 
     ${hal_sources}
@@ -70,11 +73,15 @@ target_compile_definitions(hello PRIVATE
 
 target_include_directories(lvgl PRIVATE src)
 
-target_link_options(hello PUBLIC -T${CMAKE_CURRENT_SOURCE_DIR}/src/pico.ld)
+target_link_options(hello PUBLIC
+    -Wl,--defsym=vfprintf=__i_vfprintf -Wl,--defsym=vfscanf=__i_vfscanf
+    -T${CMAKE_CURRENT_SOURCE_DIR}/src/pico.ld
+)
 set_target_properties(hello PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/pico.ld)
 
 set_property(TARGET hello PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
-target_compile_options(hello PUBLIC -g3)
+
+# target_compile_options(hello PUBLIC -g)
 
 add_custom_target(display_size ALL COMMAND llvm-size "$<TARGET_FILE:hello>" DEPENDS hello COMMENT "Binary size:")
 
