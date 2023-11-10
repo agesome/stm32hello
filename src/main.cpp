@@ -97,7 +97,7 @@ void init_task(void *arg)
 
 int main(void)
 {
-    xTaskCreate(init_task, "init_task", 1024, NULL, tskIDLE_PRIORITY + 1, NULL);
+    xTaskCreate(init_task, "init_task", 256, NULL, tskIDLE_PRIORITY + 1, NULL);
 
     vTaskStartScheduler();
 

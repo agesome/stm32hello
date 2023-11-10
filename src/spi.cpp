@@ -2,6 +2,7 @@
 #include <stm32h5xx_ll_spi.h>
 
 #include "spi.h"
+#include "stm32h5xx_hal_gpio.h"
 #include "util.h"
 
 #define kSpiPort GPIOA
@@ -17,7 +18,13 @@
 #define kLcdChipSelectPort GPIOC
 #define kLcdChipSelectPin GPIO_PIN_9
 
-SPI_HandleTypeDef spi = 
+#define kGpioSpeed GPIO_SPEED_FREQ_VERY_HIGH
+
+constexpr auto kSpiTimeout{5};
+
+static SemaphoreHandle_t spi_semaphore{};
+
+static SPI_HandleTypeDef spi = 
 {
     .Instance = SPI1,
     .Init = 
@@ -26,7 +33,25 @@ SPI_HandleTypeDef spi =
         .DataSize = SPI_DATASIZE_16BIT,
         .NSS = SPI_NSS_SOFT,
         .BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4,
-    }
+        .MasterKeepIOState = SPI_MASTER_KEEP_IO_STATE_ENABLE
+    },
+};
+
+static DMA_HandleTypeDef dma = 
+{
+    .Instance = GPDMA1_Channel0,
+    .Init = 
+    {
+        .Request = GPDMA1_REQUEST_SPI1_TX,
+        .Direction = DMA_MEMORY_TO_PERIPH,
+        .SrcInc = DMA_SINC_INCREMENTED,
+        .SrcDataWidth = DMA_SRC_DATAWIDTH_HALFWORD,
+        .DestDataWidth = DMA_DEST_DATAWIDTH_HALFWORD,
+        .Priority = DMA_HIGH_PRIORITY,
+        .SrcBurstLength = 1,
+        .DestBurstLength = 1,
+        .TransferAllocatedPort = DMA_SRC_ALLOCATED_PORT0|DMA_DEST_ALLOCATED_PORT0,
+    },
 };
 
 void spi_change_speed()
@@ -34,20 +59,52 @@ void spi_change_speed()
     LL_SPI_SetBaudRatePrescaler(SPI1, SPI_BAUDRATEPRESCALER_128);
 }
 
+extern "C" void SPI1_IRQHandler(void)
+{
+    HAL_SPI_IRQHandler(&spi);
+}
+
+extern "C" void GPDMA1_Channel0_IRQHandler()
+{
+    HAL_DMA_IRQHandler(&dma);
+}
+
+extern "C" void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
+{
+    BaseType_t do_yield{};
+    xSemaphoreGiveFromISR(spi_semaphore, &do_yield);
+    portYIELD_FROM_ISR(do_yield);
+}
+
+extern "C" void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
+{
+    message("SPI error; halt");
+    assert_failed();
+}
+
 void spi_write(uint16_t data)
 {
-    extern SPI_HandleTypeDef spi;
-
-    LL_SPI_StartMasterTransfer(spi.Instance);
-    while(!LL_SPI_IsActiveFlag_TXP(spi.Instance));
-    LL_SPI_TransmitData16(spi.Instance, data);
-    while(!LL_SPI_IsActiveFlag_TXC(spi.Instance));
+    if (HAL_SPI_Transmit(&spi, (uint8_t *) &data, 1, kSpiTimeout) != HAL_OK)
+    {
+        message("spi_write uint16_t NOK");
+    }
 }
 
-uint8_t spi_read_byte()
+void spi_write(uint16_t const *data, size_t size)
 {
-    return spi_read<1>()[0];
+    xSemaphoreTake(spi_semaphore, portMAX_DELAY);
+    if (HAL_SPI_Transmit_DMA(&spi, (uint8_t *) data, size) != HAL_OK)
+    {
+        message("spi_write uint16_t NOK");
+    }
+    xSemaphoreTake(spi_semaphore, portMAX_DELAY);
+    xSemaphoreGive(spi_semaphore);
 }
+
+// uint8_t spi_read_byte()
+// {
+//     return spi_read<1>()[0];
+// }
 
 void spi_init()
 {
@@ -56,7 +113,7 @@ void spi_init()
     {
         .Pin = kSpiMosiPin | kSpiMisoPin,
         .Mode = GPIO_MODE_AF_PP,
-        .Speed = GPIO_SPEED_FREQ_VERY_HIGH,
+        .Speed = kGpioSpeed,
         .Alternate = GPIO_AF5_SPI1,
     };
     HAL_GPIO_Init(kSpiPort, &data);
@@ -65,7 +122,8 @@ void spi_init()
     {
         .Pin = kSpiClkPin,
         .Mode = GPIO_MODE_AF_PP,
-        .Speed = GPIO_SPEED_FREQ_VERY_HIGH,
+        .Pull = GPIO_PULLUP,
+        .Speed = kGpioSpeed,
         .Alternate = GPIO_AF5_SPI1,
     };
     HAL_GPIO_Init(kSpiPort, &spiclk);
@@ -78,6 +136,7 @@ void spi_init()
     check(HAL_RCCEx_PeriphCLKConfig(&clk), "SPI clock config");
 
     __HAL_RCC_SPI1_CLK_ENABLE();
+    HAL_NVIC_EnableIRQ(SPI1_IRQn);
     check(HAL_SPI_Init(&spi), "SPI HAL init");
 
     __HAL_RCC_GPIOB_CLK_ENABLE();
@@ -87,7 +146,7 @@ void spi_init()
     {
         .Pin = kTouchChipSelectPin | kSdCardChipSelectPin,
         .Mode = GPIO_MODE_OUTPUT_PP,
-        .Speed = GPIO_SPEED_FREQ_HIGH,
+        .Speed = kGpioSpeed,
     };
     HAL_GPIO_Init(kChipSelectPort, &chipselect);
 
@@ -97,12 +156,18 @@ void spi_init()
     {
         .Pin = kLcdChipSelectPin,
         .Mode = GPIO_MODE_OUTPUT_PP,
-        .Speed = GPIO_SPEED_FREQ_HIGH,
+        .Speed = kGpioSpeed,
     };
     HAL_GPIO_Init(kLcdChipSelectPort, &lcd_chipselect);
 
-    LL_SPI_Enable(spi.Instance);
-    message("SPI enabled");
+    __HAL_RCC_GPDMA1_CLK_ENABLE();
+    HAL_NVIC_EnableIRQ(GPDMA1_Channel0_IRQn);
+    check(HAL_DMA_Init(&dma), "DMA init");
+    __HAL_LINKDMA(&spi, hdmatx, dma);
+
+    spi_semaphore = xSemaphoreCreateCounting(2, 1);
+
+    message("SPI init done");
 }
 
 static uint16_t chipselect_pins[] = {kLcdChipSelectPin, kTouchChipSelectPin, kSdCardChipSelectPin};

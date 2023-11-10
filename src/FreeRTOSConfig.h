@@ -16,7 +16,7 @@
 #define configTASK_NOTIFICATION_ARRAY_ENTRIES   1
 #define configUSE_MUTEXES                       1
 #define configUSE_RECURSIVE_MUTEXES             0
-#define configUSE_COUNTING_SEMAPHORES           0
+#define configUSE_COUNTING_SEMAPHORES           1
 #define configQUEUE_REGISTRY_SIZE               10
 #define configUSE_QUEUE_SETS                    0
 #define configUSE_TIME_SLICING                  0
@@ -34,7 +34,7 @@
 /* Hook function related definitions. */
 #define configUSE_IDLE_HOOK                     0
 #define configUSE_TICK_HOOK                     0
-#define configCHECK_FOR_STACK_OVERFLOW          2
+#define configCHECK_FOR_STACK_OVERFLOW          0
 #define configUSE_MALLOC_FAILED_HOOK            1
 #define configUSE_DAEMON_TASK_STARTUP_HOOK      0
 #define configUSE_SB_COMPLETED_CALLBACK         0
@@ -56,7 +56,7 @@
 
 /* Define to trap errors during development. */
 void assert_failed();
-#define configASSERT( x ) if((x) == 0) assert_failed()
+// #define configASSERT( x ) if((x) == 0) assert_failed()
 
 #define configENABLE_FPU 1
 #define configENABLE_MPU 0

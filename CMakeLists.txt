@@ -40,7 +40,7 @@ set(cmsis_sources
 
 add_executable(hello
     src/main.cpp
-    src/adcdma.cpp
+    #src/adcdma.cpp
     src/clock.cpp
     src/interrupts.c
     src/syscalls.c
@@ -80,8 +80,6 @@ target_link_options(hello PUBLIC
 set_target_properties(hello PROPERTIES LINK_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/src/pico.ld)
 
 set_property(TARGET hello PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
-
-# target_compile_options(hello PUBLIC -g)
 
 add_custom_target(display_size ALL COMMAND llvm-size "$<TARGET_FILE:hello>" DEPENDS hello COMMENT "Binary size:")
 

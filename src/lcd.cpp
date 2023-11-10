@@ -8,6 +8,7 @@
 #include "spi.h"
 
 #include <lvgl.h>
+#include <vector>
 
 #define kLcdResetPort GPIOC
 #define kLcdResetPin GPIO_PIN_7
@@ -50,7 +51,7 @@ static void reset()
     HAL_GPIO_WritePin(kLcdResetPort, kLcdResetPin, GPIO_PIN_RESET);
     vTaskDelay(20);
     HAL_GPIO_WritePin(kLcdResetPort, kLcdResetPin, GPIO_PIN_SET);
-    vTaskDelay(80);
+    vTaskDelay(150);
 }
 
 static void mode(Mode m)
@@ -92,8 +93,8 @@ static void init_pins()
 
 static void send(uint8_t cmd)
 {
-    chipselect_low(SpiDevice::Display);
     mode(Mode::Command);
+    chipselect_low(SpiDevice::Display);
     spi_write(cmd);
     chipselect_high(SpiDevice::Display);
 }
@@ -102,14 +103,11 @@ template<size_t N>
 static std::enable_if<(N > 0)>::type send(uint8_t cmd, bytes<N> data)
 {
     send(cmd);
-    chipselect_low(SpiDevice::Display);
     mode(Mode::Data);
-    for (const auto byte : data)
-    {
-        spi_write(byte);
-    }
+    chipselect_low(SpiDevice::Display);
+    spi_write(data);
     chipselect_high(SpiDevice::Display);
-}
+}   
 
 static void select(uint16_t ystart, uint16_t xstart, uint16_t yend, uint16_t xend)
 {
@@ -117,38 +115,27 @@ static void select(uint16_t ystart, uint16_t xstart, uint16_t yend, uint16_t xen
     send(0x2b, bytes{(uint8_t)(ystart >> 8), (uint8_t)(ystart & 0xFF), (uint8_t)(yend >> 8), (uint8_t)(yend & 0xFF)});
 }
 
-uint16_t color565(uint8_t r, uint8_t g, uint8_t b)
-{
-    return ((r & 0xF8) << 8) | ((g & 0xFC) << 3) | ((b & 0xF8) >> 3);
-}
-
 static void fill(pixel p)
 {
-    extern SPI_HandleTypeDef spi;
     send(0x2c);
     chipselect_low(SpiDevice::Display);
     mode(Mode::Data);
-    for (auto i = 0; i < kWidth * kHeight; ++i)
+    std::vector<uint16_t> line(kWidth, p.value);
+    for (auto i = 0; i < kHeight; ++i)
     {
-        spi_write(p.value);
+        spi_write(line.data(), line.size());
     }
     chipselect_high(SpiDevice::Display);
 }
 
 void flush(lv_disp_drv_t * disp, const lv_area_t * area, lv_color_t * color_p)
 {
-    int32_t x, y;
-
     select(area->y1, area->x1, area->y2, area->x2);
     send(0x2c);
     chipselect_low(SpiDevice::Display);
     mode(Mode::Data);
-    for(y = area->y1; y <= area->y2; y++) {
-        for(x = area->x1; x <= area->x2; x++) {
-            spi_write(color_p->full);
-            color_p++;
-        }
-    }
+    const size_t count = (area->y2 - area->y1 + 1) * (area->x2 - area->x1 + 1);
+    spi_write((uint16_t*)color_p, count);
     chipselect_high(SpiDevice::Display);
     lv_disp_flush_ready(disp);
 }
@@ -158,8 +145,8 @@ static void update_task(void*)
     message("start update task");
     for (;;)
     {
-        lv_timer_handler();
-        vTaskDelay(1);
+        auto v = lv_timer_handler();
+        vTaskDelay((v == LV_NO_TIMER_READY) ? 1 : v);
     }
 }
 
@@ -172,7 +159,7 @@ void lcd_init()
     send(0xc1, bytes{0x45, 0x00});
     send(0xc2, bytes{0x44});
     send(0xc5, bytes{0x00, 0x28});
-    send(0xb1, bytes{0xd0, 0x11});
+    send(0xb1, bytes{0xa0, 0x10});
     send(0xb4, bytes{0x02});
 
     send(0xb7, bytes{0x07});
@@ -197,8 +184,8 @@ void lcd_init()
     lv_init();
 
     static lv_disp_draw_buf_t draw_buf;
-    lv_color_t *buf1 = new lv_color_t[kWidth * 2];
-    lv_disp_draw_buf_init(&draw_buf, buf1, NULL, kWidth * 2);
+    lv_color_t *buf1 = new lv_color_t[kWidth * 5];
+    lv_disp_draw_buf_init(&draw_buf, buf1, NULL, kWidth * 5);
 
     message("buf init ok");
 
@@ -269,13 +256,15 @@ void lcd_init()
     /*Add a needle line indicator*/
     indic = lv_meter_add_needle_line(meter, scale, 4, lv_palette_main(LV_PALETTE_GREY), -10);
 
-    xTaskCreate(update_task, "update_task", 1024, NULL, tskIDLE_PRIORITY + 1, NULL);
+    xTaskCreate(update_task, "update_task", 1024, NULL, tskIDLE_PRIORITY + 2, NULL);
 
     static char buf[64];
     int v = 0;
     bool d = false;
     for(;;)
     {
+        // vTaskDelay(100);
+        // continue;
         // message("%d", v);
         lv_meter_set_indicator_value(meter, indic, v);
         // lv_bar_set_value(bar, p, LV_ANIM_OFF);
@@ -291,8 +280,8 @@ void lcd_init()
             d = true;
         if (v == 0)
             d = false;
-        if (v % 5 == 0)
-            vTaskDelay(1);
+        // if (v % 5 == 0)
+            vTaskDelay(15);
         // lv_label_set_text(label, "Down");
     }
 
