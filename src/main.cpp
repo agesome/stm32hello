@@ -15,68 +15,30 @@ void dma_init();
 void clock_init();
 void uart_init();
 void lcd_init();
-
-const auto adc_ref_voltage = 3300;
-volatile uint32_t adc_error = 0;
-volatile uint32_t conversions = 0;
-volatile uint32_t adc_sum = 0;
-
-const size_t buflen = 128;
-uint16_t buffer[buflen];
-
-extern "C" void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
-{
-    uint32_t sum{};
-    for (size_t i = buflen / 2; i < buflen; ++i)
-    {
-        sum += __LL_ADC_CALC_DATA_TO_VOLTAGE(adc_ref_voltage, buffer[i], LL_ADC_RESOLUTION_12B);
-    }
-    adc_sum = adc_sum + sum;
-    conversions = conversions + buflen;
-}
-
-extern "C" void HAL_ADC_ConvHalfCpltCallback(ADC_HandleTypeDef *hadc)
-{
-    uint32_t sum{};
-    for (size_t i = 0; i < buflen / 2; ++i)
-    {
-        sum += __LL_ADC_CALC_DATA_TO_VOLTAGE(adc_ref_voltage, buffer[i], LL_ADC_RESOLUTION_12B);
-    }
-    adc_sum = adc_sum + sum;
-}
-
-extern "C" void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *hadc)
-{
-    adc_error = hadc->ErrorCode;
-}
+void ui_init();
+void timebase_init();
 
 void mainloop(void *arg)
 {
-    message("enter mainloop");
+    message("start mainloop");
     for(;;)
     {
         vTaskDelay(500);
     }
 }
 
-void spi_change_speed();
-
 void init_task(void *arg)
 {
     clock_init();
     HAL_Init();
-    uart_init();
-
-    // adc_init();
-    // dma_init();
-
     HAL_ICACHE_Enable();
     
-    // extern ADC_HandleTypeDef adc_handle;
-    // HAL_ADC_Start_DMA(&adc_handle, (uint32_t *) &buffer, buflen);
-
+    uart_init();
+    timebase_init();
+    adc_init();
     spi_init();
     lcd_init();
+    ui_init();
 
 #if 0
     if (sdcard_init())
@@ -90,8 +52,7 @@ void init_task(void *arg)
     }
 #endif
 
-    xTaskCreate(mainloop, "mainloop", configMINIMAL_STACK_SIZE, NULL, tskIDLE_PRIORITY, NULL);
-
+    xTaskCreate(mainloop, "mainloop", 128, NULL, tskIDLE_PRIORITY, NULL);
     vTaskDelete(NULL);
 }
 
@@ -100,8 +61,6 @@ int main(void)
     xTaskCreate(init_task, "init_task", 256, NULL, tskIDLE_PRIORITY + 1, NULL);
 
     vTaskStartScheduler();
-
-    for (;;) {}
 
     return 0;
 }

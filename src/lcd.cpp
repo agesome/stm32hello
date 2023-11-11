@@ -16,6 +16,8 @@
 #define kLcdDataCommandPort GPIOA
 #define kLcdDataCommandPin GPIO_PIN_8
 
+SemaphoreHandle_t lvgl_semaphore{};
+
 enum class Mode
 {
     Data,
@@ -51,7 +53,7 @@ static void reset()
     HAL_GPIO_WritePin(kLcdResetPort, kLcdResetPin, GPIO_PIN_RESET);
     vTaskDelay(20);
     HAL_GPIO_WritePin(kLcdResetPort, kLcdResetPin, GPIO_PIN_SET);
-    vTaskDelay(150);
+    vTaskDelay(80);
 }
 
 static void mode(Mode m)
@@ -95,7 +97,8 @@ static void send(uint8_t cmd)
 {
     mode(Mode::Command);
     chipselect_low(SpiDevice::Display);
-    spi_write(cmd);
+    uint16_t v = cmd;
+    spi_write(&v, 1);
     chipselect_high(SpiDevice::Display);
 }
 
@@ -128,25 +131,88 @@ static void fill(pixel p)
     chipselect_high(SpiDevice::Display);
 }
 
-void flush(lv_disp_drv_t * disp, const lv_area_t * area, lv_color_t * color_p)
+struct write_item
 {
+    const lv_area_t *area;
+    const lv_color_t *color;
+};
+
+lv_disp_drv_t disp_drv{};
+
+QueueHandle_t spi_queue;
+
+static void flush_callback(lv_disp_drv_t * disp, const lv_area_t * area, lv_color_t * color)
+{
+#if 1
+    write_item w {area, color};
+    if (xQueueSend(spi_queue, &w, portMAX_DELAY) != pdTRUE)
+    {
+        message("queue send failed");
+    }
+#else
     select(area->y1, area->x1, area->y2, area->x2);
     send(0x2c);
     chipselect_low(SpiDevice::Display);
     mode(Mode::Data);
     const size_t count = (area->y2 - area->y1 + 1) * (area->x2 - area->x1 + 1);
-    spi_write((uint16_t*)color_p, count);
+    spi_write((uint16_t*)color, count);
     chipselect_high(SpiDevice::Display);
     lv_disp_flush_ready(disp);
+#endif
 }
 
-static void update_task(void*)
+static void spi_writer(void*)
 {
-    message("start update task");
+    for(;;)
+    {
+        write_item w{};
+        if (xQueueReceive(spi_queue, &w, portMAX_DELAY) == pdTRUE)
+        {
+            select(w.area->y1, w.area->x1, w.area->y2, w.area->x2);
+            send(0x2c);
+            chipselect_low(SpiDevice::Display);
+            mode(Mode::Data);
+            const size_t count = (w.area->y2 - w.area->y1 + 1) * (w.area->x2 - w.area->x1 + 1);
+            spi_write((uint16_t*)w.color, count);
+            chipselect_high(SpiDevice::Display);
+            lv_disp_flush_ready(&disp_drv);
+        }
+    }
+}
+
+static void lvgl_render(void*)
+{
+    message("start lvgl init");
+    lv_init();
+
+    const auto bufsize = kWidth * 5;
+
+    lv_disp_draw_buf_t draw_buf{};
+    lv_disp_draw_buf_init(&draw_buf, new lv_color_t[bufsize], new lv_color_t[bufsize], bufsize);
+    
+    lv_disp_drv_init(&disp_drv);
+
+    disp_drv.flush_cb = flush_callback;
+    disp_drv.draw_buf = &draw_buf;
+    disp_drv.hor_res = kWidth;
+    disp_drv.ver_res = kHeight;
+
+    lv_disp_drv_register(&disp_drv);
+
+    message("lvgl init done");
+
+    xSemaphoreTake(lvgl_semaphore, portMAX_DELAY);
+
+    message("start update loop");
+    xSemaphoreGive(lvgl_semaphore);
     for (;;)
     {
-        auto v = lv_timer_handler();
-        vTaskDelay((v == LV_NO_TIMER_READY) ? 1 : v);
+        if (xSemaphoreTake(lvgl_semaphore, 1))
+        {
+            auto v = lv_timer_handler();
+            xSemaphoreGive(lvgl_semaphore);
+            vTaskDelay((v == LV_NO_TIMER_READY) ? 1 : v);
+        }
     }
 }
 
@@ -159,7 +225,7 @@ void lcd_init()
     send(0xc1, bytes{0x45, 0x00});
     send(0xc2, bytes{0x44});
     send(0xc5, bytes{0x00, 0x28});
-    send(0xb1, bytes{0xa0, 0x10});
+    send(0xb1, bytes{0xc0, 0x10});
     send(0xb4, bytes{0x02});
 
     send(0xb7, bytes{0x07});
@@ -180,124 +246,10 @@ void lcd_init()
     message("LCD init done");
 
 #if 1
-    message("start init");
-    lv_init();
-
-    static lv_disp_draw_buf_t draw_buf;
-    lv_color_t *buf1 = new lv_color_t[kWidth * 5];
-    lv_disp_draw_buf_init(&draw_buf, buf1, NULL, kWidth * 5);
-
-    message("buf init ok");
-
-    static lv_disp_drv_t disp_drv;
-    lv_disp_drv_init(&disp_drv);
-
-    message("drv init ok");
-
-    disp_drv.flush_cb = flush;
-    disp_drv.draw_buf = &draw_buf;
-    disp_drv.hor_res = kWidth;
-    disp_drv.ver_res = kHeight;
-    auto *disp = lv_disp_drv_register(&disp_drv);
-
-    // disp->theme = lv_theme_basic_init(disp);
-
-    message("init done");
-
-    lv_obj_t * label = lv_label_create(lv_scr_act());
-    lv_obj_set_pos(label, 10, 10);                            /*Set its position*/
-    lv_obj_set_size(label, 120, 50);                          /*Set its size*/
-
-    // lv_obj_t * label = lv_label_create(btn);          /*Add a label to the button*/
-    // lv_label_set_text(label, "Button");                     /*Set the labels text*/
-    // lv_obj_center(label);
-
-    // lv_obj_t * bar = lv_bar_create(lv_scr_act());
-    // lv_obj_set_pos(bar, 240, 160);
-    // lv_obj_set_size(bar, 120, 50); 
-    // lv_bar_set_range(bar, 0, 100);
-    // lv_bar_set_start_value(bar, 0, LV_ANIM_OFF);
-    // lv_bar_set_mode(bar, LV_BAR_MODE_RANGE);
-
-    // auto *led = lv_led_create(lv_scr_act());
-    // lv_obj_center(led);
-
-    auto *meter = lv_meter_create(lv_scr_act());
-    lv_obj_center(meter);
-    lv_obj_set_size(meter, 320, 320); 
-    lv_meter_scale_t * scale = lv_meter_add_scale(meter);
-    lv_meter_set_scale_ticks(meter, scale, 41, 2, 10, lv_palette_main(LV_PALETTE_GREY));
-    lv_meter_set_scale_major_ticks(meter, scale, 8, 4, 15, lv_color_black(), 10);
-    
-    lv_meter_indicator_t * indic;
-
-    /*Add a blue arc to the start*/
-    indic = lv_meter_add_arc(meter, scale, 3, lv_palette_main(LV_PALETTE_BLUE), 0);
-    lv_meter_set_indicator_start_value(meter, indic, 0);
-    lv_meter_set_indicator_end_value(meter, indic, 20);
-
-    /*Make the tick lines blue at the start of the scale*/
-    indic = lv_meter_add_scale_lines(meter, scale, lv_palette_main(LV_PALETTE_BLUE), lv_palette_main(LV_PALETTE_BLUE),
-                                     false, 0);
-    lv_meter_set_indicator_start_value(meter, indic, 0);
-    lv_meter_set_indicator_end_value(meter, indic, 20);
-
-    /*Add a red arc to the end*/
-    indic = lv_meter_add_arc(meter, scale, 3, lv_palette_main(LV_PALETTE_RED), 0);
-    lv_meter_set_indicator_start_value(meter, indic, 80);
-    lv_meter_set_indicator_end_value(meter, indic, 100);
-
-    /*Make the tick lines red at the end of the scale*/
-    indic = lv_meter_add_scale_lines(meter, scale, lv_palette_main(LV_PALETTE_RED), lv_palette_main(LV_PALETTE_RED), false,
-                                     0);
-    lv_meter_set_indicator_start_value(meter, indic, 80);
-    lv_meter_set_indicator_end_value(meter, indic, 100);
-
-    /*Add a needle line indicator*/
-    indic = lv_meter_add_needle_line(meter, scale, 4, lv_palette_main(LV_PALETTE_GREY), -10);
-
-    xTaskCreate(update_task, "update_task", 1024, NULL, tskIDLE_PRIORITY + 2, NULL);
-
-    static char buf[64];
-    int v = 0;
-    bool d = false;
-    for(;;)
-    {
-        // vTaskDelay(100);
-        // continue;
-        // message("%d", v);
-        lv_meter_set_indicator_value(meter, indic, v);
-        // lv_bar_set_value(bar, p, LV_ANIM_OFF);
-        // lv_led_set_brightness(led, p);
-        // lv_led_toggle(led);
-        // sprintf(buf, "value: %d", p);
-        // lv_label_set_text(label, buf);
-        // lv_label_set_text_static(label, buf);
-        // lv_label_set_text_fmt(label, "value: %d", v);
-        // taskYIELD();
-        d ? --v : ++v;
-        if (v == 100)
-            d = true;
-        if (v == 0)
-            d = false;
-        // if (v % 5 == 0)
-            vTaskDelay(15);
-        // lv_label_set_text(label, "Down");
-    }
-
-    // for (;;)
-    // 
-        // message("60");
-        // lv_bar_set_value(bar, 60, LV_ANIM_OFF);
-        // lv_timer_handler();
-        // vTaskDelay(5000);
-        // message("10");
-        // lv_bar_set_value(bar, 10, LV_ANIM_OFF);
-        // lv_timer_handler();
-        // vTaskDelay(50);
-        // message("%d", i % 100);
-    // }
-
+    lvgl_semaphore = xSemaphoreCreateBinary();
+    spi_queue = xQueueCreate(8, sizeof(write_item));
+    xTaskCreate(spi_writer, "spi", 256, NULL, tskIDLE_PRIORITY + 3, NULL);
+    xTaskCreate(lvgl_render, "render", 1024, NULL, tskIDLE_PRIORITY + 2, NULL);
 #else
     select(0, 0, 320, 480);
 

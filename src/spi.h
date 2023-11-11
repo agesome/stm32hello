@@ -34,6 +34,9 @@ void spi_write(const bytes<N> &data)
     spi_write(data.data(), N);
 }
 
+void spi_write_async(uint16_t const *data, size_t size);
+void spi_write_async_wait();
+
 // template<size_t N>
 // bytes<N> spi_read()
 // {

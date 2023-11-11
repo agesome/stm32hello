@@ -3,7 +3,8 @@
 void clock_init()
 {
     // high voltage scale for high clocks
-    check_silent(HAL_PWREx_ControlVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE0));
+    __HAL_PWR_VOLTAGESCALING_CONFIG(PWR_REGULATOR_VOLTAGE_SCALE0);
+    while(!__HAL_PWR_GET_FLAG(PWR_FLAG_VOSRDY)) {}
 
     // HSE -> PLL1 at 250MHz
     const RCC_OscInitTypeDef init =

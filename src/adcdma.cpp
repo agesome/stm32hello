@@ -1,22 +1,27 @@
 #include <stm32h5xx_hal.h>
+#include <stm32h5xx_ll_rcc.h>
+
 #include <stdio.h>
 
 #include "util.h"
 
+const auto adc_ref_voltage = 3300;
+volatile uint32_t adc_error = 0;
+
 extern DMA_HandleTypeDef dma_handle;
+
+volatile uint16_t adc_value;
 
 ADC_HandleTypeDef adc_handle = 
 {
     .Instance = ADC1,
     .Init = 
     {
-        .ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4,
-        .Resolution = ADC_RESOLUTION_12B,
-        .EOCSelection = ADC_EOC_SEQ_CONV,
-        .ContinuousConvMode = ENABLE,
-        .DMAContinuousRequests = ENABLE,
+        .ClockPrescaler = ADC_CLOCK_ASYNC_DIV64,
+        .Resolution = ADC_RESOLUTION_8B,
+        .EOCSelection = ADC_EOC_SINGLE_CONV,
+        .ExternalTrigConv = ADC_SOFTWARE_START,
     },
-    .DMA_Handle = &dma_handle
 };
 
 DMA_HandleTypeDef dma_handle = 
@@ -38,13 +43,27 @@ extern "C" void ADC1_IRQHandler()
     HAL_ADC_IRQHandler(&adc_handle);
 }
 
-extern "C" void GPDMA1_Channel0_IRQHandler()
+extern "C" void HAL_ADC_ConvCpltCallback(ADC_HandleTypeDef *hadc)
 {
-    HAL_DMA_IRQHandler(&dma_handle);
+    adc_value = HAL_ADC_GetValue(hadc);
+    HAL_ADC_Start_IT(hadc);
+    // sum += __LL_ADC_CALC_DATA_TO_VOLTAGE(adc_ref_voltage, buffer[i], LL_ADC_RESOLUTION_12B);
 }
+
+extern "C" void HAL_ADC_ErrorCallback(ADC_HandleTypeDef *hadc)
+{
+    adc_error = hadc->ErrorCode;
+}
+
+// extern "C" void GPDMA1_Channel0_IRQHandler()
+// {
+//     HAL_DMA_IRQHandler(&dma_handle);
+// }
 
 void adc_init()
 {
+    LL_RCC_SetADCDACClockSource(LL_RCC_ADCDAC_CLKSOURCE_HCLK);
+
     __HAL_RCC_ADC_CLK_ENABLE();
     __HAL_RCC_GPIOA_CLK_ENABLE();
 
@@ -52,7 +71,7 @@ void adc_init()
 
     const GPIO_InitTypeDef gpio = 
     {
-        .Pin =  GPIO_PIN_0,
+        .Pin = GPIO_PIN_0,
         .Mode = GPIO_MODE_ANALOG
     };
     HAL_GPIO_Init(GPIOA, &gpio);
@@ -63,13 +82,16 @@ void adc_init()
     {
         .Channel = ADC_CHANNEL_0,
         .Rank = ADC_REGULAR_RANK_1,
-        .SamplingTime = ADC_SAMPLETIME_3CYCLES_5,
+        .SamplingTime = ADC_SAMPLETIME_640CYCLES_5,
         .SingleDiff = ADC_SINGLE_ENDED,
         .OffsetNumber = ADC_OFFSET_NONE,
     };
 
     check(HAL_ADC_ConfigChannel(&adc_handle, &channel), "ADC channel config");
     check(HAL_ADCEx_Calibration_Start(&adc_handle, ADC_SINGLE_ENDED), "ADC calibration");
+
+    extern ADC_HandleTypeDef adc_handle;
+    HAL_ADC_Start_IT(&adc_handle);
 }
 
 void dma_init()

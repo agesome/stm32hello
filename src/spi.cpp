@@ -1,8 +1,9 @@
 #include <stm32h5xx_hal.h>
-#include <stm32h5xx_ll_spi.h>
+#include <stm32h5xx_ll_rcc.h>
+
+#include <stm32h5xx.h>
 
 #include "spi.h"
-#include "stm32h5xx_hal_gpio.h"
 #include "util.h"
 
 #define kSpiPort GPIOA
@@ -84,7 +85,7 @@ extern "C" void HAL_SPI_ErrorCallback(SPI_HandleTypeDef *hspi)
 
 void spi_write(uint16_t data)
 {
-    if (HAL_SPI_Transmit(&spi, (uint8_t *) &data, 1, kSpiTimeout) != HAL_OK)
+    if (HAL_SPI_Transmit_DMA(&spi, (uint8_t *) &data, 1) != HAL_OK)
     {
         message("spi_write uint16_t NOK");
     }
@@ -100,6 +101,23 @@ void spi_write(uint16_t const *data, size_t size)
     xSemaphoreTake(spi_semaphore, portMAX_DELAY);
     xSemaphoreGive(spi_semaphore);
 }
+
+void spi_write_async(uint16_t const *data, size_t size)
+{
+    xSemaphoreTake(spi_semaphore, portMAX_DELAY);
+    if (HAL_SPI_Transmit_DMA(&spi, (uint8_t *) data, size) != HAL_OK)
+    {
+        message("spi_write uint16_t NOK");
+    }
+
+}
+
+void spi_write_async_wait()
+{
+    xSemaphoreTake(spi_semaphore, portMAX_DELAY);
+    xSemaphoreGive(spi_semaphore);
+}
+
 
 // uint8_t spi_read_byte()
 // {
@@ -128,13 +146,8 @@ void spi_init()
     };
     HAL_GPIO_Init(kSpiPort, &spiclk);
 
-    const RCC_PeriphCLKInitTypeDef clk = 
-    {
-        .PeriphClockSelection = RCC_PERIPHCLK_SPI1,
-        .Spi1ClockSelection = RCC_SPI1CLKSOURCE_PLL1Q
-    };
-    check(HAL_RCCEx_PeriphCLKConfig(&clk), "SPI clock config");
-
+    __HAL_RCC_PLL1_CLKOUT_ENABLE(RCC_PLL1_DIVQ);
+    LL_RCC_SetSPIClockSource(LL_RCC_SPI1_CLKSOURCE_PLL1Q);
     __HAL_RCC_SPI1_CLK_ENABLE();
     HAL_NVIC_EnableIRQ(SPI1_IRQn);
     check(HAL_SPI_Init(&spi), "SPI HAL init");

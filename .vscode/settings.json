@@ -2,4 +2,12 @@
     // "cortex-debug.armToolchainPath": 
     "cortex-debug.armToolchainPrefix": "llvm",
     "cortex-debug.gdbPath": "arm-none-eabi-gdb",
+    "files.associations": {
+        "new": "cpp",
+        "ui.h": "c",
+        "lvgl.h": "c",
+        "stm32h5xx_hal.h": "c",
+        "lv_gpu_stm32_dma2d.h": "c"
+    },
+    "cortex-debug.variableUseNaturalFormat": true,
 }

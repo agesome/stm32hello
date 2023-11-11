@@ -5,6 +5,8 @@ project(hello C CXX ASM)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_C_STANDARD 23)
 
+# set(CMAKE_INTERPROCEDURAL_OPTIMIZATION ON)
+
 # set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wframe-larger-than=32  -fstack-protector-strong -Oz")
 # set(CMAKE_CXX_FLAGS "${CMAKE_C_FLAGS} -Wframe-larger-than=32  -fstack-protector-strong -Oz")
 
@@ -14,8 +16,9 @@ set(FREERTOS_HEAP 3 CACHE STRING "")
 add_subdirectory(3rdparty/freertos)
 
 add_subdirectory(3rdparty/lvgl EXCLUDE_FROM_ALL)
+target_include_directories(lvgl PRIVATE src)
 
-set(hal_sources
+add_library(stmicro OBJECT
     3rdparty/stmicro/hal/stm32h5xx_hal.c
     3rdparty/stmicro/hal/stm32h5xx_hal_adc.c
     3rdparty/stmicro/hal/stm32h5xx_hal_adc_ex.c
@@ -24,23 +27,28 @@ set(hal_sources
     3rdparty/stmicro/hal/stm32h5xx_hal_dma_ex.c
     3rdparty/stmicro/hal/stm32h5xx_hal_gpio.c
     3rdparty/stmicro/hal/stm32h5xx_hal_icache.c
-    3rdparty/stmicro/hal/stm32h5xx_hal_pwr.c
-    3rdparty/stmicro/hal/stm32h5xx_hal_pwr_ex.c
     3rdparty/stmicro/hal/stm32h5xx_hal_rcc.c
     3rdparty/stmicro/hal/stm32h5xx_hal_rcc_ex.c
     3rdparty/stmicro/hal/stm32h5xx_hal_uart.c
-    3rdparty/stmicro/hal/stm32h5xx_hal_uart_ex.c
     3rdparty/stmicro/hal/stm32h5xx_hal_spi.c
     3rdparty/stmicro/hal/stm32h5xx_hal_spi_ex.c
-)
-
-set(cmsis_sources
+    3rdparty/stmicro/hal/stm32h5xx_hal_tim.c
+    3rdparty/stmicro/hal/stm32h5xx_hal_tim_ex.c
     3rdparty/stmicro/cmsis/system_stm32h5xx.c
 )
 
+target_include_directories(stmicro PUBLIC
+    src
+    3rdparty/stmicro/hal
+    3rdparty/stmicro/cmsis
+    3rdparty/stmicro/cmsis/Core/Include
+)
+
+target_compile_definitions(stmicro PUBLIC STM32H5 STM32H503xx)
+
 add_executable(hello
     src/main.cpp
-    #src/adcdma.cpp
+    src/adcdma.cpp
     src/clock.cpp
     src/interrupts.c
     src/syscalls.c
@@ -50,28 +58,18 @@ add_executable(hello
     # src/sdcard.cpp
     src/hooks.c
     src/spi.cpp
-
-    ${hal_sources}
-    ${cmsis_sources}
+    src/ui.cpp
+    src/timebase.cpp
 )
 
-target_include_directories(hello PRIVATE
-    src
-    3rdparty/stmicro/hal
-    3rdparty/stmicro/cmsis
-    3rdparty/stmicro/cmsis/Core/Include
-)
+target_include_directories(hello PUBLIC src)
 
 target_link_libraries(hello
     freertos_kernel
     lvgl
     crt0
+    stmicro
 )
-target_compile_definitions(hello PRIVATE
-    STM32H5 STM32H503xx
-)
-
-target_include_directories(lvgl PRIVATE src)
 
 target_link_options(hello PUBLIC
     -Wl,--defsym=vfprintf=__i_vfprintf -Wl,--defsym=vfscanf=__i_vfscanf

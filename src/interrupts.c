@@ -48,7 +48,8 @@ void default_handler()
 
 void ADC1_IRQHandler();
 void GPDMA1_Channel0_IRQHandler();
-void SPI1_IRQHandler(void);
+void SPI1_IRQHandler();
+void TIM2_IRQHandler();
 
 __attribute__((__section__(".data.init.enter")))
 void (* const __interrupt_vector[256])(void) __attribute((aligned(128))) =
@@ -64,7 +65,8 @@ void (* const __interrupt_vector[256])(void) __attribute((aligned(128))) =
     entry(0x30, default_handler), // debugmon
     entry(0x38, PendSV_Handler), // pendsv
     entry(0x3c, systick_handler),
-    // [ADC1_IRQn + NVIC_USER_IRQ_OFFSET] = ADC1_IRQHandler,
+    [ADC1_IRQn + NVIC_USER_IRQ_OFFSET] = ADC1_IRQHandler,
     [SPI1_IRQn + NVIC_USER_IRQ_OFFSET] = SPI1_IRQHandler,
-    [GPDMA1_Channel0_IRQn + NVIC_USER_IRQ_OFFSET] = GPDMA1_Channel0_IRQHandler
+    [GPDMA1_Channel0_IRQn + NVIC_USER_IRQ_OFFSET] = GPDMA1_Channel0_IRQHandler,
+    [TIM2_IRQn + NVIC_USER_IRQ_OFFSET] = TIM2_IRQHandler,
 };
