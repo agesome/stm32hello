@@ -7,7 +7,9 @@
         "ui.h": "c",
         "lvgl.h": "c",
         "stm32h5xx_hal.h": "c",
-        "lv_gpu_stm32_dma2d.h": "c"
+        "lv_gpu_stm32_dma2d.h": "c",
+        "algorithm": "cpp",
+        "cmath": "cpp"
     },
     "cortex-debug.variableUseNaturalFormat": true,
 }

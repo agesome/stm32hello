@@ -10,6 +10,8 @@
 #include <lvgl.h>
 #include <vector>
 
+void ui_init();
+
 #define kLcdResetPort GPIOC
 #define kLcdResetPin GPIO_PIN_7
 
@@ -61,7 +63,7 @@ static void mode(Mode m)
     HAL_GPIO_WritePin(kLcdDataCommandPort, kLcdDataCommandPin, m == Mode::Command ? GPIO_PIN_RESET : GPIO_PIN_SET);
 }
 
-static void backlight(bool on)
+void backlight(bool on)
 {
     HAL_GPIO_WritePin(GPIOC, GPIO_PIN_6, on ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
@@ -91,6 +93,15 @@ static void init_pins()
     };
     HAL_GPIO_Init(GPIOC, &bl);
     backlight(false);
+
+    __HAL_RCC_GPIOB_CLK_ENABLE();
+    const GPIO_InitTypeDef pen = 
+    {
+        .Pin = GPIO_PIN_3 | GPIO_PIN_10,
+        .Mode = GPIO_MODE_INPUT,
+        .Speed = GPIO_SPEED_FREQ_HIGH
+    };
+    HAL_GPIO_Init(GPIOB, &pen);
 }
 
 static void send(uint8_t cmd)
@@ -161,6 +172,64 @@ static void flush_callback(lv_disp_drv_t * disp, const lv_area_t * area, lv_colo
 #endif
 }
 
+lv_point_t read_touch()
+{
+    extern SPI_HandleTypeDef spi;
+
+    constexpr auto offset = 128u;
+    constexpr auto diff = 120.0f;
+    constexpr auto ycoeff = kHeight / diff;
+    constexpr auto xcoeff = kWidth / diff;
+
+    constexpr uint8_t yaxis = 0xd0;
+    constexpr uint8_t xaxis = 0x90;
+    uint16_t x{};
+    uint16_t y{};
+
+    spi_take();
+
+    LL_SPI_SetBaudRatePrescaler(spi.Instance, SPI_BAUDRATEPRESCALER_256);
+    LL_SPI_SetDataWidth(spi.Instance, SPI_DATASIZE_8BIT);
+
+    chipselect_low(SpiDevice::Touch);
+    HAL_SPI_Transmit(&spi, (uint8_t *)&yaxis, 1, 5);
+    HAL_SPI_Receive(&spi, (uint8_t *)&y, 2, 5);
+    chipselect_high(SpiDevice::Touch);
+
+    chipselect_low(SpiDevice::Touch);
+    HAL_SPI_Transmit(&spi, (uint8_t *)&xaxis, 1, 5);
+    HAL_SPI_Receive(&spi, (uint8_t *)&x, 2, 5);
+    chipselect_high(SpiDevice::Touch);
+
+    chipselect_low(SpiDevice::Touch);
+    HAL_SPI_Transmit(&spi, (uint8_t *)&xaxis, 1, 5);
+    chipselect_high(SpiDevice::Touch);
+
+    LL_SPI_SetBaudRatePrescaler(spi.Instance, SPI_BAUDRATEPRESCALER_4);
+    LL_SPI_SetDataWidth(spi.Instance, SPI_DATASIZE_16BIT);
+
+    spi_give();
+
+    const lv_coord_t screen_x = kWidth - (x - offset) * xcoeff;
+    const lv_coord_t screen_y = (y - offset) * ycoeff;
+#if 0
+    message("%d x %d (%d x %d)", screen_x, screen_y, x, y);
+#endif
+    return {screen_x, screen_y};
+}
+
+void read_touchscreen_callback(lv_indev_drv_t * drv, lv_indev_data_t*data)
+{
+    if (HAL_GPIO_ReadPin(GPIOB, GPIO_PIN_3))
+    {
+        data->state = LV_INDEV_STATE_RELEASED;
+        return;
+    }
+
+    data->state = LV_INDEV_STATE_PRESSED;
+    data->point = read_touch();
+}
+
 static void spi_writer(void*)
 {
     for(;;)
@@ -197,14 +266,22 @@ static void lvgl_render(void*)
     disp_drv.hor_res = kWidth;
     disp_drv.ver_res = kHeight;
 
-    lv_disp_drv_register(&disp_drv);
+    auto *disp = lv_disp_drv_register(&disp_drv);
+    // disp->theme = lv_theme_basic_init(disp);
+
+    lv_indev_drv_t indev_drv{};
+    lv_indev_drv_init(&indev_drv);
+    indev_drv.type = LV_INDEV_TYPE_POINTER;
+    indev_drv.read_cb = read_touchscreen_callback;
+    lv_indev_drv_register(&indev_drv);
+
+    ui_init();
 
     message("lvgl init done");
 
-    xSemaphoreTake(lvgl_semaphore, portMAX_DELAY);
+    read_touch();
 
     message("start update loop");
-    xSemaphoreGive(lvgl_semaphore);
     for (;;)
     {
         if (xSemaphoreTake(lvgl_semaphore, 1))
@@ -247,6 +324,7 @@ void lcd_init()
 
 #if 1
     lvgl_semaphore = xSemaphoreCreateBinary();
+    xSemaphoreGive(lvgl_semaphore);
     spi_queue = xQueueCreate(8, sizeof(write_item));
     xTaskCreate(spi_writer, "spi", 256, NULL, tskIDLE_PRIORITY + 3, NULL);
     xTaskCreate(lvgl_render, "render", 1024, NULL, tskIDLE_PRIORITY + 2, NULL);

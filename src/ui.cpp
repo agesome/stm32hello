@@ -17,6 +17,17 @@ lv_obj_t * bar{};
 
 ////
 
+void backlight(bool on);
+
+static void cb_handler(lv_event_t * e)
+{
+    lv_event_code_t code = lv_event_get_code(e);
+    lv_obj_t * obj = lv_event_get_target(e);
+    if(code == LV_EVENT_VALUE_CHANGED) {
+        backlight(lv_obj_get_state(obj) & LV_STATE_CHECKED);
+    }
+}
+
 static void ui(void*)
 {
     message("start ui loop");
@@ -26,7 +37,7 @@ static void ui(void*)
         // int v = ((float) adc_value / 0xff) * 100;
         xSemaphoreTake(lvgl_semaphore, portMAX_DELAY);
         // lv_meter_set_indicator_value(meter, indic, adc_value);
-        lv_bar_set_value(bar, adc_value, LV_ANIM_OFF);
+        // lv_bar_set_value(bar, adc_value, LV_ANIM_OFF);
         xSemaphoreGive(lvgl_semaphore);
         vTaskDelay(10);
     }
@@ -34,48 +45,20 @@ static void ui(void*)
 
 void ui_init()
 {
-    // meter = lv_meter_create(lv_scr_act());
-    // lv_obj_center(meter);
-    // lv_obj_set_size(meter, 320, 320); 
+    lv_obj_set_flex_flow(lv_scr_act(), LV_FLEX_FLOW_COLUMN);
 
-    // lv_meter_scale_t * scale = lv_meter_add_scale(meter);
-    // lv_meter_set_scale_ticks(meter, scale, 41, 2, 10, lv_palette_main(LV_PALETTE_GREY));
-    // lv_meter_set_scale_major_ticks(meter, scale, 8, 4, 15, lv_color_black(), 10);
-    // lv_meter_set_scale_range(meter, scale, 0, 255, 275, 0);
+    auto *cb = lv_checkbox_create(lv_scr_act());
+    lv_checkbox_set_text(cb, "hehe?");
+    cb = lv_checkbox_create(lv_scr_act());
+    lv_checkbox_set_text(cb, "not hehe?");
 
-    // /*Add a blue arc to the start*/
-    // indic = lv_meter_add_arc(meter, scale, 3, lv_palette_main(LV_PALETTE_BLUE), 0);
-    // lv_meter_set_indicator_start_value(meter, indic, 0);
-    // lv_meter_set_indicator_end_value(meter, indic, 20);
+    cb = lv_checkbox_create(lv_scr_act());
+    lv_obj_add_state(cb, LV_STATE_CHECKED);
+    lv_obj_add_event_cb(cb, cb_handler, LV_EVENT_ALL, NULL);
+    lv_checkbox_set_text(cb, "backlight on?");
 
-    // /*Make the tick lines blue at the start of the scale*/
-    // indic = lv_meter_add_scale_lines(meter, scale, lv_palette_main(LV_PALETTE_BLUE), lv_palette_main(LV_PALETTE_BLUE),
-    //                                  false, 0);
-    // lv_meter_set_indicator_start_value(meter, indic, 0);
-    // lv_meter_set_indicator_end_value(meter, indic, 20);
-
-    // /*Add a red arc to the end*/
-    // indic = lv_meter_add_arc(meter, scale, 3, lv_palette_main(LV_PALETTE_RED), 0);
-    // lv_meter_set_indicator_start_value(meter, indic, 80);
-    // lv_meter_set_indicator_end_value(meter, indic, 100);
-
-    // /*Make the tick lines red at the end of the scale*/
-    // indic = lv_meter_add_scale_lines(meter, scale, lv_palette_main(LV_PALETTE_RED), lv_palette_main(LV_PALETTE_RED), false,
-    //                                  0);
-    // lv_meter_set_indicator_start_value(meter, indic, 80);
-    // lv_meter_set_indicator_end_value(meter, indic, 100);
-
-    // /*Add a needle line indicator*/
-    // indic = lv_meter_add_needle_line(meter, scale, 4, lv_palette_main(LV_PALETTE_GREY), -10);
-
-    // auto *s = lv_spinner_create(lv_scr_act(), 2500, 45);
-    // lv_obj_set_size(s, 320, 320);
-    // lv_obj_center(s);
-
-    bar = lv_bar_create(lv_scr_act());
-    lv_bar_set_range(bar, 0, 255);
-    lv_obj_set_size(bar, 200, 20);
-    lv_obj_center(bar);
+    auto *s =  lv_slider_create(lv_scr_act());
+    lv_slider_set_range(s, 0, 100);
 
     xSemaphoreGive(lvgl_semaphore);
 

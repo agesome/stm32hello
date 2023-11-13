@@ -481,7 +481,7 @@
 
 #define LV_USE_CANVAS     0
 
-#define LV_USE_CHECKBOX   0
+#define LV_USE_CHECKBOX   1
 
 #define LV_USE_DROPDOWN   0   /*Requires: lv_label*/
 
@@ -489,7 +489,7 @@
 
 #define LV_USE_LABEL      1
 #if LV_USE_LABEL
-    #define LV_LABEL_TEXT_SELECTION 1 /*Enable selecting text of the label*/
+    #define LV_LABEL_TEXT_SELECTION 0 /*Enable selecting text of the label*/
     #define LV_LABEL_LONG_TXT_HINT 1  /*Store some extra info in labels to speed up drawing of very long texts*/
 #endif
 
@@ -500,7 +500,7 @@
     #define LV_ROLLER_INF_PAGES 7 /*Number of extra "pages" when the roller is infinite*/
 #endif
 
-#define LV_USE_SLIDER     0   /*Requires: lv_bar*/
+#define LV_USE_SLIDER     1   /*Requires: lv_bar*/
 
 #define LV_USE_SWITCH     0
 
@@ -577,10 +577,10 @@
 #if LV_USE_THEME_DEFAULT
 
     /*0: Light mode; 1: Dark mode*/
-    #define LV_THEME_DEFAULT_DARK 1
+    #define LV_THEME_DEFAULT_DARK 0
 
     /*1: Enable grow on press*/
-    #define LV_THEME_DEFAULT_GROW 0
+    #define LV_THEME_DEFAULT_GROW 1
 
     /*Default transition time in [ms]*/
     #define LV_THEME_DEFAULT_TRANSITION_TIME 80
@@ -597,7 +597,7 @@
  *----------*/
 
 /*A layout similar to Flexbox in CSS.*/
-#define LV_USE_FLEX 0
+#define LV_USE_FLEX 1
 
 /*A layout similar to Grid in CSS.*/
 #define LV_USE_GRID 0

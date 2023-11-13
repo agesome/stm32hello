@@ -15,7 +15,6 @@ void dma_init();
 void clock_init();
 void uart_init();
 void lcd_init();
-void ui_init();
 void timebase_init();
 
 void mainloop(void *arg)
@@ -38,8 +37,7 @@ void init_task(void *arg)
     adc_init();
     spi_init();
     lcd_init();
-    ui_init();
-
+    
 #if 0
     if (sdcard_init())
     {

@@ -21,11 +21,9 @@
 
 #define kGpioSpeed GPIO_SPEED_FREQ_VERY_HIGH
 
-constexpr auto kSpiTimeout{5};
-
 static SemaphoreHandle_t spi_semaphore{};
 
-static SPI_HandleTypeDef spi = 
+SPI_HandleTypeDef spi = 
 {
     .Instance = SPI1,
     .Init = 
@@ -112,12 +110,21 @@ void spi_write_async(uint16_t const *data, size_t size)
 
 }
 
-void spi_write_async_wait()
+void spi_take()
 {
     xSemaphoreTake(spi_semaphore, portMAX_DELAY);
+}
+
+void spi_give()
+{
     xSemaphoreGive(spi_semaphore);
 }
 
+// void spi_write_async_wait()
+// {
+    
+    
+// }
 
 // uint8_t spi_read_byte()
 // {
